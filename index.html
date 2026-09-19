@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0f3a7d">
+<title>সংস্থা ব্যবস্থাপনা</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ===== হেডার ===== -->
+<header class="hd">
+  <button class="burger" id="burger" onclick="toggleSide()" aria-label="মেনু">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+  </button>
+  <h1 id="orgName">সংস্থার নাম</h1>
+  <img id="orgLogo" alt="লোগো" style="display:none">
+</header>
+
+<div class="ov" id="ov" onclick="closeSide()"></div>
+<aside class="side" id="side">
+  <nav id="menu"></nav>
+</aside>
+
+<!-- ===== মূল অংশ ===== -->
+<main class="wrap">
+
+  <!-- ড্যাশবোর্ড -->
+  <section class="page active" id="pg-dashboard">
+    <div class="ptop"><h2>ড্যাশবোর্ড</h2></div>
+    <div class="stats" id="stats"></div>
+  </section>
+
+  <!-- সংস্থা তথ্য -->
+  <section class="page" id="pg-about">
+    <div class="ptop"><h2>সংস্থা তথ্য</h2>
+      <button class="btn ghost" onclick="printAbout()"><i data-ic="print"></i> প্রিন্ট</button>
+    </div>
+    <div class="card" id="aboutBody"></div>
+  </section>
+
+  <!-- সদস্য এন্ট্রি -->
+  <section class="page" id="pg-memberEntry">
+    <div class="ptop"><h2>সদস্য এন্ট্রি</h2></div>
+    <div class="card">
+      <h3 id="mTitle">নতুন সদস্য এন্ট্রি</h3>
+      <input type="hidden" id="mId">
+      <div class="fg">
+        <label>ক্রম (অটো)<input id="mSerial" readonly></label>
+        <label>তারিখ<input type="date" id="mDate"></label>
+        <label>নাম<input id="mName" autocomplete="off"></label>
+        <label>মোবাইল নং<input id="mMobile" type="tel" inputmode="tel"></label>
+        <label>পেশা<input id="mJob"></label>
+        <label>ধার্য্য (মাসিক)<input id="mFee" inputmode="decimal"></label>
+        <label class="full">ঠিকানা<textarea id="mAddr" rows="2"></textarea></label>
+      </div>
+      <div class="btns">
+        <button class="btn" onclick="saveMember()">সংরক্ষণ করুন</button>
+        <button class="btn ghost" id="mCancel" onclick="resetMemberForm()" style="display:none">বাতিল</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>সদস্য তালিকা</h3>
+      <div class="tools">
+        <input id="mSearch" placeholder="নাম, মোবাইল বা ক্রম দিয়ে খুঁজুন" oninput="renderMembers()">
+        <button class="btn ghost" onclick="printMembers()"><i data-ic="print"></i> প্রিন্ট</button>
+      </div>
+      <div class="tw">
+        <table class="rt">
+          <thead><tr><th>ক্রম</th><th>তারিখ</th><th>নাম</th><th>মোবাইল</th><th>পেশা</th><th>ধার্য্য</th><th>ঠিকানা</th><th></th></tr></thead>
+          <tbody id="mBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- সদস্য চাঁদা আদায় -->
+  <section class="page" id="pg-collection">
+    <div class="ptop"><h2>সদস্য চাঁদা আদায়</h2></div>
+    <div class="card">
+      <h3 id="cTitle">নতুন চাঁদা আদায়</h3>
+      <input type="hidden" id="cId">
+      <div class="fg">
+        <label>রশিদ নং (অটো)<input id="cReceipt" readonly></label>
+        <label>তারিখ<input type="date" id="cDate" onchange="recalcDue()"></label>
+        <label class="full">সদস্যের নাম
+          <select id="cMember" onchange="onMemberPick()"></select>
+        </label>
+        <label>ক্রম<input id="cSerial" readonly></label>
+        <label>মোবাইল নং<input id="cMobile" readonly></label>
+        <label class="full">ঠিকানা<input id="cAddr" readonly></label>
+        <label>ধার্য্য (মাসিক)<input id="cFee" readonly></label>
+        <label>বকেয়া (আজ পর্যন্ত)<input id="cDue" readonly class="hl"></label>
+        <label>পরিশোধ<input id="cPaid" inputmode="decimal" oninput="updateRemain()"></label>
+        <label>পরিশোধের পর অবশিষ্ট<input id="cRemain" readonly></label>
+      </div>
+      <div class="btns">
+        <button class="btn" onclick="saveColl()">সংরক্ষণ করুন</button>
+        <button class="btn ghost" id="cCancel" onclick="resetCollForm()" style="display:none">বাতিল</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>আদায়ের তালিকা</h3>
+      <div class="tools">
+        <input id="cSearch" placeholder="নাম, রশিদ নং বা ক্রম দিয়ে খুঁজুন" oninput="renderColl()">
+        <button class="btn ghost" onclick="printCollList()"><i data-ic="print"></i> প্রিন্ট</button>
+      </div>
+      <div class="tw">
+        <table class="rt">
+          <thead><tr><th>রশিদ নং</th><th>তারিখ</th><th>নাম</th><th>ক্রম</th><th>ধার্য্য</th><th>পূর্ব বকেয়া</th><th>পরিশোধ</th><th></th></tr></thead>
+          <tbody id="cBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- বিশেষ কালেকশন -->
+  <section class="page" id="pg-special">
+    <div class="ptop"><h2>বিশেষ কালেকশন</h2></div>
+    <div class="card">
+      <h3 id="sTitle">বিশেষ কালেকশন ফরম</h3>
+      <input type="hidden" id="sId">
+      <div class="fg">
+        <label>রশিদ নং (অটো)<input id="sReceipt" readonly></label>
+        <label>তারিখ<input type="date" id="sDate"></label>
+        <label>নাম<input id="sName" autocomplete="off"></label>
+        <label>মোবাইল নং<input id="sMobile" type="tel" inputmode="tel"></label>
+        <label class="full">ঠিকানা<input id="sAddr"></label>
+        <label class="full">বিবরণ<textarea id="sDesc" rows="2"></textarea></label>
+        <label>টাকা<input id="sAmt" inputmode="decimal"></label>
+      </div>
+      <div class="btns">
+        <button class="btn" onclick="saveSpecial()">সংরক্ষণ করুন</button>
+        <button class="btn ghost" id="sCancel" onclick="resetSpecialForm()" style="display:none">বাতিল</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>বিশেষ কালেকশন তালিকা</h3>
+      <div class="tools">
+        <input id="sSearch" placeholder="নাম, রশিদ নং বা বিবরণ দিয়ে খুঁজুন" oninput="renderSpecial()">
+        <button class="btn ghost" onclick="printSpecialList()"><i data-ic="print"></i> প্রিন্ট</button>
+      </div>
+      <div class="tw">
+        <table class="rt">
+          <thead><tr><th>রশিদ নং</th><th>তারিখ</th><th>নাম</th><th>মোবাইল</th><th>বিবরণ</th><th>টাকা</th><th></th></tr></thead>
+          <tbody id="sBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- খরচ -->
+  <section class="page" id="pg-expense">
+    <div class="ptop"><h2>খরচ</h2></div>
+    <div class="card">
+      <h3 id="eTitle">নতুন খরচ ভাউচার</h3>
+      <input type="hidden" id="eId">
+      <div class="fg">
+        <label>ভাউচার নং (অটো)<input id="eVoucher" readonly></label>
+        <label>তারিখ<input type="date" id="eDate"></label>
+      </div>
+      <div class="tw">
+        <table class="dyn">
+          <thead><tr><th class="c">ক্রম</th><th>বিবরণ</th><th>টাকা</th><th></th></tr></thead>
+          <tbody id="eRows"></tbody>
+        </table>
+      </div>
+      <button class="btn ghost sm" onclick="dynAdd('exp')"><i data-ic="plus"></i> সারি যোগ করুন</button>
+      <div class="tot">
+        <div><span>সর্বমোট</span><b id="eTotal">৳ ০</b></div>
+        <div><span>পরিশোধ</span><input id="ePaid" inputmode="decimal" oninput="calcExp()" placeholder="০"></div>
+        <div><span>বকেয়া</span><b id="eDue">৳ ০</b></div>
+      </div>
+      <div class="btns">
+        <button class="btn" onclick="saveExp()">সংরক্ষণ করুন</button>
+        <button class="btn ghost" id="eCancel" onclick="resetExpForm()" style="display:none">বাতিল</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>খরচের তালিকা</h3>
+      <div class="tools">
+        <input id="eSearch" placeholder="ভাউচার নং বা বিবরণ দিয়ে খুঁজুন" oninput="renderExp()">
+        <button class="btn ghost" onclick="printExpList()"><i data-ic="print"></i> প্রিন্ট</button>
+      </div>
+      <div class="tw">
+        <table class="rt">
+          <thead><tr><th>ভাউচার নং</th><th>তারিখ</th><th>সর্বমোট</th><th>পরিশোধ</th><th>বকেয়া</th><th></th></tr></thead>
+          <tbody id="eBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- কমিটি -->
+  <section class="page" id="pg-committee">
+    <div class="ptop"><h2>কমিটি</h2>
+      <button class="btn ghost" onclick="printCommittee()"><i data-ic="print"></i> প্রিন্ট</button>
+    </div>
+    <div class="card" id="cmBody"></div>
+  </section>
+
+  <!-- নোটিশ -->
+  <section class="page" id="pg-notices">
+    <div class="ptop"><h2>নোটিশ</h2></div>
+    <div id="nList"></div>
+    <div id="nView" style="display:none"></div>
+  </section>
+
+  <!-- ব্যবস্থাপনা: সেটাপ ফরম -->
+  <section class="page" id="pg-setup">
+    <div class="ptop"><h2>সেটাপ ফরম</h2>
+      <button class="btn ghost sm" onclick="lockNow()"><i data-ic="lock"></i> লক করুন</button>
+    </div>
+    <div class="card">
+      <h3>সংস্থার তথ্য</h3>
+      <div class="fg">
+        <label class="full">সংস্থার নাম<input id="stName"></label>
+        <label>প্রতিষ্ঠাকাল<input id="stEst"></label>
+        <label>রেজিস্ট্রেশন নং<input id="stReg"></label>
+        <label class="full">ঠিকানা<textarea id="stAddr" rows="2"></textarea></label>
+        <label>মোবাইল নং (১)<input id="stM1" type="tel" inputmode="tel"></label>
+        <label>মোবাইল নং (২)<input id="stM2" type="tel" inputmode="tel"></label>
+        <label>মোবাইল নং (৩)<input id="stM3" type="tel" inputmode="tel"></label>
+        <label>Email<input id="stEmail" type="email"></label>
+        <label>Facebook লিংক<input id="stFb" placeholder="https://facebook.com/..."></label>
+        <label>YouTube লিংক<input id="stYt" placeholder="https://youtube.com/..."></label>
+        <label class="full">লোগো
+          <div class="logo-up">
+            <img id="stLogoPrev" alt="" style="display:none">
+            <input type="file" id="stLogoFile" accept="image/*" onchange="onLogoFile(this)">
+            <button type="button" class="btn ghost sm" onclick="clearLogo()">লোগো মুছুন</button>
+          </div>
+        </label>
+      </div>
+    </div>
+    <div class="card">
+      <h3>প্রতিষ্ঠাতাদের নাম ও ঠিকানা</h3>
+      <div class="tw">
+        <table class="dyn">
+          <thead><tr><th class="c">ক্রম</th><th>নাম</th><th>ঠিকানা</th><th></th></tr></thead>
+          <tbody id="stFounders"></tbody>
+        </table>
+      </div>
+      <button class="btn ghost sm" onclick="dynAdd('fnd')"><i data-ic="plus"></i> সারি যোগ করুন</button>
+    </div>
+    <div class="btns pad"><button class="btn" onclick="saveSetup()">সেটাপ সংরক্ষণ করুন</button></div>
+    <div class="card">
+      <h3>পাসওয়ার্ড পরিবর্তন</h3>
+      <div class="fg">
+        <label>নতুন পাসওয়ার্ড<input id="stNewPw" type="password" autocomplete="new-password"></label>
+      </div>
+      <div class="btns"><button class="btn ghost" onclick="changePw()">পাসওয়ার্ড পরিবর্তন করুন</button></div>
+    </div>
+  </section>
+
+  <!-- ব্যবস্থাপনা: কমিটি ফরম -->
+  <section class="page" id="pg-committeeForm">
+    <div class="ptop"><h2>কমিটি ফরম</h2>
+      <button class="btn ghost sm" onclick="lockNow()"><i data-ic="lock"></i> লক করুন</button>
+    </div>
+    <div class="card">
+      <div class="fg">
+        <label>কমিটি গঠনের তারিখ<input type="date" id="cfDate"></label>
+        <label>মেয়াদকাল<input id="cfTerm" placeholder="যেমন: ২ বছর"></label>
+      </div>
+      <div class="tw">
+        <table class="dyn">
+          <thead><tr><th class="c">ক্রম</th><th>পদবি</th><th>নাম</th><th>মোবাইল নং</th><th></th></tr></thead>
+          <tbody id="cfRows"></tbody>
+        </table>
+      </div>
+      <button class="btn ghost sm" onclick="dynAdd('cmt')"><i data-ic="plus"></i> সারি যোগ করুন</button>
+      <div class="btns"><button class="btn" onclick="saveCommittee()">কমিটি সংরক্ষণ করুন</button></div>
+    </div>
+  </section>
+
+  <!-- ব্যবস্থাপনা: নোটিশ ফরম -->
+  <section class="page" id="pg-noticeForm">
+    <div class="ptop"><h2>নোটিশ ফরম</h2>
+      <button class="btn ghost sm" onclick="lockNow()"><i data-ic="lock"></i> লক করুন</button>
+    </div>
+    <div class="card">
+      <h3 id="nfTitleH">নতুন নোটিশ</h3>
+      <input type="hidden" id="nfId">
+      <div class="fg">
+        <label>তারিখ<input type="date" id="nfDate"></label>
+        <label>শিরোনাম<input id="nfTitle"></label>
+        <label class="full">বিস্তারিত<textarea id="nfDetails" rows="8" class="just"></textarea></label>
+      </div>
+      <p class="hint">স্বাক্ষর: অফিস সম্পাদক, সভাপতি (প্রিন্টে স্বয়ংক্রিয়ভাবে যুক্ত হবে)</p>
+      <div class="btns">
+        <button class="btn" onclick="saveNotice()">সংরক্ষণ করুন</button>
+        <button class="btn ghost" id="nfCancel" onclick="resetNoticeForm()" style="display:none">বাতিল</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>নোটিশ তালিকা</h3>
+      <div class="tw">
+        <table class="rt">
+          <thead><tr><th>তারিখ</th><th>শিরোনাম</th><th></th></tr></thead>
+          <tbody id="nfBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ===== ফুটার ===== -->
+<footer class="ft">
+  <div class="ft-in">
+    <div class="ft-l" id="ftLeft"></div>
+    <div class="ft-r" id="ftRight"></div>
+  </div>
+  <div class="ft-b">@AM Shahed: <a href="tel:01605721296">01605721296</a></div>
+</footer>
+
+<!-- প্রিন্ট এলাকা -->
+<div id="printArea"></div>
+
+<!-- পাসওয়ার্ড মডাল -->
+<div class="modal" id="pwModal" onclick="if(event.target===this)closePw()">
+  <div class="mbox">
+    <h3>ব্যবস্থাপনা পাসওয়ার্ড</h3>
+    <input type="password" id="pwInput" placeholder="পাসওয়ার্ড লিখুন" onkeydown="if(event.key==='Enter')submitPw()">
+    <div class="perr" id="pwErr"></div>
+    <div class="btns">
+      <button class="btn" onclick="submitPw()">প্রবেশ করুন</button>
+      <button class="btn ghost" onclick="closePw()">বাতিল</button>
+    </div>
+  </div>
+</div>
+
+<div id="loader"><span></span></div>
+<div id="toast" class="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

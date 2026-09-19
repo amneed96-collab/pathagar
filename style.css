@@ -1,0 +1,265 @@
+:root{
+  --navy:#0f3a7d;
+  --navy-d:#0a2a5c;
+  --navy-l:#e9f0fb;
+  --lime:#c6e34a;
+  --ink:#14213d;
+  --muted:#5b6b85;
+  --line:#d9e2f0;
+  --bg:#f1f5fb;
+  --red:#c0392b;
+  --hh:60px;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;min-height:100vh;display:flex;flex-direction:column;
+  font-family:'Hind Siliguri','Noto Sans Bengali',system-ui,sans-serif;
+  background:var(--bg);color:var(--ink);font-size:16px;line-height:1.55;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+.ic{flex:none;vertical-align:middle}
+
+/* ===== হেডার ===== */
+.hd{
+  position:sticky;top:0;z-index:50;height:var(--hh);
+  display:grid;grid-template-columns:48px 1fr 48px;align-items:center;gap:8px;
+  padding:0 10px;background:var(--navy);color:#fff;
+  border-bottom:3px solid var(--lime);
+}
+.hd h1{margin:0;text-align:center;font-size:20px;font-weight:700;line-height:1.2;
+  overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.hd img{width:44px;height:44px;object-fit:contain;background:#fff;border-radius:50%;padding:2px;justify-self:end}
+.burger{width:44px;height:44px;border:0;border-radius:10px;background:transparent;color:#fff;
+  display:grid;place-items:center;cursor:pointer}
+.burger:hover,.burger:focus-visible{background:rgba(255,255,255,.14);outline:none}
+
+/* ===== সাইডমেনু ===== */
+.ov{position:fixed;inset:0;z-index:30;background:rgba(10,42,92,.45);opacity:0;pointer-events:none;transition:opacity .2s}
+.side{
+  position:fixed;z-index:40;top:var(--hh);bottom:0;left:0;width:284px;max-width:86vw;
+  background:#fff;border-right:1px solid var(--line);overflow-y:auto;
+  transform:translateX(-100%);transition:transform .22s ease;padding:10px 0 24px;
+}
+body.side-open .side{transform:none;box-shadow:6px 0 24px rgba(10,42,92,.18)}
+body.side-open .ov{opacity:1;pointer-events:auto}
+.mi,.si{
+  display:flex;align-items:center;gap:12px;width:100%;border:0;background:none;text-align:left;
+  padding:12px 20px;cursor:pointer;color:var(--ink);font-weight:500;
+  border-left:4px solid transparent;
+}
+.mi:hover,.si:hover{background:var(--navy-l)}
+.mi:focus-visible,.si:focus-visible{outline:2px solid var(--navy);outline-offset:-2px}
+.mi.on,.si.on{background:var(--navy-l);border-left-color:var(--lime);color:var(--navy);font-weight:700}
+.mi span:first-of-type{flex:1}
+.mi .lk{color:var(--muted);display:inline-flex;flex:none}
+.mi .chev{display:inline-flex;transition:transform .2s;color:var(--muted);flex:none}
+.mg.open .chev{transform:rotate(180deg)}
+.sub{display:none;background:#f7f9fd;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.mg.open .sub{display:block}
+.si{padding-left:56px;font-size:15px}
+
+/* ===== মূল অংশ ===== */
+.wrap{flex:1;width:100%;max-width:1100px;margin:0 auto;padding:16px 12px 28px}
+.page{display:none}
+.page.active{display:block}
+.ptop{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.ptop h2{margin:0;font-size:22px;color:var(--navy)}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+.card h3{margin:0 0 12px;font-size:17px;color:var(--navy)}
+.empty{text-align:center;color:var(--muted);padding:22px 8px}
+
+/* ===== ড্যাশবোর্ড ===== */
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.stat{background:#fff;border:1px solid var(--line);border-left:5px solid var(--navy);border-radius:12px;padding:14px 14px 12px}
+.stat span{display:flex;align-items:center;gap:8px;color:var(--muted);font-weight:500;font-size:15px}
+.stat b{display:block;margin-top:4px;font-size:24px;line-height:1.25;color:var(--navy);word-break:break-word}
+.stat small{color:var(--muted);font-size:12.5px}
+.stat.cash{background:var(--navy);border-color:var(--navy);border-left-color:var(--lime);grid-column:1/-1}
+.stat.cash span,.stat.cash small{color:#cfe0fb}
+.stat.cash b{color:var(--lime);font-size:30px}
+.stat.due{border-left-color:var(--red)}
+.stat.due b{color:var(--red)}
+
+/* ===== ফর্ম ===== */
+.fg{display:grid;grid-template-columns:1fr;gap:12px}
+.fg label{display:flex;flex-direction:column;gap:4px;font-weight:600;font-size:14.5px;color:var(--ink)}
+.fg .full{grid-column:1/-1}
+input,select,textarea{
+  width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;background:#fff;
+  font-weight:400;min-height:44px;
+}
+textarea{resize:vertical}
+textarea.just{text-align:justify}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--navy);box-shadow:0 0 0 3px rgba(15,58,125,.15)}
+input[readonly]{background:#f3f6fb;color:#33445f}
+input.hl{font-weight:700;color:var(--red)}
+.hint{margin:8px 0 0;color:var(--muted);font-size:14px}
+.logo-up{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.logo-up img{width:64px;height:64px;object-fit:contain;border:1px solid var(--line);border-radius:10px;padding:3px;background:#fff}
+.logo-up input[type=file]{flex:1;min-width:180px}
+
+.btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.btns.pad{margin:0 0 14px}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  border:1.5px solid var(--navy);background:var(--navy);color:#fff;
+  padding:10px 20px;border-radius:10px;font-weight:600;cursor:pointer;min-height:44px;
+}
+.btn:hover{background:var(--navy-d)}
+.btn:focus-visible{outline:3px solid var(--lime);outline-offset:2px}
+.btn.ghost{background:#fff;color:var(--navy)}
+.btn.ghost:hover{background:var(--navy-l)}
+.btn.sm{padding:6px 12px;min-height:36px;font-size:14.5px}
+.tw+.btn.sm{margin-top:10px}
+
+.tools{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.tools input{flex:1;min-width:160px}
+
+/* ===== টেবিল ===== */
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{background:var(--navy-l);color:var(--navy);font-weight:700;font-size:14.5px;white-space:nowrap}
+td.act{white-space:nowrap;text-align:right}
+.ib{
+  display:inline-grid;place-items:center;width:36px;height:36px;margin-left:4px;
+  border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--navy);cursor:pointer;
+}
+.ib:hover{background:var(--navy-l)}
+.ib.del{color:var(--red)}
+.ib.del:hover{background:#fdecea}
+.ib:focus-visible{outline:2px solid var(--navy)}
+
+table.dyn td,table.dyn th{padding:6px 4px}
+table.dyn input{min-width:0;padding:8px 10px}
+table.dyn .c{width:40px;text-align:center;color:var(--muted)}
+table.dyn td:last-child{width:44px}
+
+/* খরচের যোগফল */
+.tot{margin:14px 0 0 auto;max-width:320px;border:1.5px solid var(--navy);border-radius:12px;overflow:hidden}
+.tot>div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 12px;border-bottom:1px solid var(--line)}
+.tot>div:last-child{border-bottom:0;background:var(--navy-l)}
+.tot input{width:120px;text-align:right;min-height:38px;padding:6px 10px}
+.tot span{font-weight:600}
+.tot b{color:var(--navy);font-size:18px}
+
+/* তথ্য তালিকা */
+.kvs{display:grid;grid-template-columns:1fr;gap:0;margin-bottom:14px}
+.kvs>div{display:flex;gap:10px;padding:9px 0;border-bottom:1px dashed var(--line)}
+.kvs span{flex:0 0 130px;color:var(--muted);font-weight:500}
+.kvs b{flex:1;font-weight:600;word-break:break-word}
+.kvs a{color:var(--navy)}
+.org-hero{display:flex;align-items:center;gap:14px;margin-bottom:14px;padding-bottom:14px;border-bottom:2px solid var(--lime)}
+.org-hero img{width:72px;height:72px;object-fit:contain}
+.org-hero h3{margin:0;font-size:21px}
+
+/* নোটিশ */
+.nitem{
+  display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;
+  text-align:left;background:#fff;border:1px solid var(--line);border-left:5px solid var(--navy);
+  border-radius:12px;padding:12px 14px;margin-bottom:10px;cursor:pointer;
+}
+.nitem:hover{background:var(--navy-l)}
+.nitem:focus-visible{outline:3px solid var(--lime)}
+.nd{color:var(--muted);font-size:14px}
+.nt{font-weight:600;font-size:17px;color:var(--navy)}
+.paper{background:#fff;border:1px solid var(--line);border-radius:14px;padding:22px 20px;margin-top:12px}
+.ntitle{text-align:center;text-decoration:underline;margin:10px 0 14px;font-size:19px}
+.ndet{text-align:justify;white-space:pre-wrap;line-height:1.85;word-break:break-word}
+.nmeta{text-align:right;font-weight:600}
+.sigs{display:flex;justify-content:space-between;gap:20px;margin-top:64px}
+.sigs div{border-top:1px solid #000;padding-top:4px;min-width:130px;text-align:center}
+
+/* ===== ফুটার ===== */
+.ft{background:var(--navy-d);color:#dbe7fb;margin-top:auto;border-top:3px solid var(--lime)}
+.ft-in{max-width:1100px;margin:0 auto;padding:18px 14px;display:grid;grid-template-columns:1fr;gap:16px}
+.ft-h{font-weight:700;color:#fff;font-size:17px;margin-bottom:4px}
+.ft-row{display:flex;gap:8px;align-items:flex-start;font-size:14.5px;margin:3px 0}
+.ft-row .ic{margin-top:4px;color:var(--lime)}
+.ft a{color:#fff;text-decoration:none}
+.ft a:hover{text-decoration:underline}
+.ft-r{display:flex;flex-wrap:wrap;gap:10px;align-content:flex-start}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border:1px solid rgba(255,255,255,.35);border-radius:999px;font-size:14.5px}
+.chip:hover{background:rgba(255,255,255,.12);text-decoration:none!important}
+.ft-b{text-align:center;padding:10px;background:#071d41;font-size:14.5px;color:#cfe0fb}
+.ft-b a{color:var(--lime);font-weight:600}
+
+/* ===== মডাল, লোডার, টোস্ট ===== */
+.modal{position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;background:rgba(10,42,92,.55);padding:16px}
+.modal.show{display:flex}
+.mbox{background:#fff;border-radius:16px;padding:20px;width:100%;max-width:360px}
+.mbox h3{margin:0 0 12px;color:var(--navy)}
+.perr{color:var(--red);min-height:22px;font-size:14px;margin-top:6px}
+#loader{position:fixed;left:0;right:0;top:var(--hh);height:4px;z-index:80;display:none;background:rgba(15,58,125,.15);overflow:hidden}
+#loader.show{display:block}
+#loader span{display:block;height:100%;width:35%;background:var(--lime);animation:ld 1s infinite ease-in-out}
+@keyframes ld{0%{margin-left:-35%}100%{margin-left:100%}}
+.toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,30px);z-index:95;
+  background:var(--navy-d);color:#fff;padding:11px 20px;border-radius:12px;opacity:0;pointer-events:none;
+  transition:.2s;max-width:90vw;text-align:center}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.toast.err{background:var(--red)}
+
+/* ===== মোবাইল: টেবিল কার্ডে রূপান্তর ===== */
+@media (max-width:700px){
+  table.rt thead{display:none}
+  table.rt,table.rt tbody,table.rt tr,table.rt td{display:block;width:100%}
+  table.rt tr{border:1px solid var(--line);border-radius:12px;margin-bottom:10px;padding:8px 12px;background:#fff}
+  table.rt td{display:flex;justify-content:space-between;gap:14px;border:0;padding:4px 0;text-align:right}
+  table.rt td::before{content:attr(data-l);font-weight:600;color:var(--muted);text-align:left;flex:0 0 36%}
+  table.rt td.act{justify-content:flex-end;padding-top:8px}
+  table.rt td.act::before{display:none}
+  table.rt td.empty{display:block;text-align:center}
+  table.rt td.empty::before{display:none}
+  table.dyn .c:first-child{width:22px}
+  .tot{max-width:none}
+}
+
+/* ===== ডেস্কটপ ===== */
+@media (min-width:701px){
+  .hd h1{font-size:24px}
+  .fg{grid-template-columns:repeat(3,1fr)}
+  .stats{grid-template-columns:repeat(3,1fr)}
+  .stat.cash{grid-column:auto}
+  .ft-in{grid-template-columns:1fr 1fr}
+  .ft-r{justify-content:flex-end}
+  .kvs{grid-template-columns:1fr 1fr;column-gap:28px}
+}
+
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important;animation:none!important}
+}
+
+/* ===== প্রিন্ট ===== */
+#printArea{display:none;color:#000;font-family:'Hind Siliguri','Noto Sans Bengali',sans-serif;font-size:13.5px;line-height:1.5}
+@media print{
+  @page{size:A4;margin:12mm}
+  html,body{background:#fff!important}
+  body>*:not(#printArea){display:none!important}
+  #printArea{display:block}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+#printArea .dh{display:flex;align-items:center;gap:14px;border-bottom:2px solid #0f3a7d;padding-bottom:8px;margin-bottom:10px}
+#printArea .dh img{width:64px;height:64px;object-fit:contain}
+#printArea .dh .tx{flex:1;text-align:center}
+#printArea .dh h1{margin:0;font-size:25px;color:#0f3a7d;line-height:1.25}
+#printArea .dh p{margin:1px 0;font-size:12.5px}
+#printArea .dh.sm img{width:46px;height:46px}
+#printArea .dh.sm h1{font-size:19px}
+#printArea .dh.sm p{font-size:11.5px}
+#printArea .dt{text-align:center;font-size:19px;font-weight:700;margin:10px 0}
+#printArea .dt.u span{border-bottom:2px solid #000;padding-bottom:1px}
+#printArea .meta{display:flex;justify-content:space-between;margin:6px 0 8px}
+#printArea table{width:100%;border-collapse:collapse}
+#printArea th,#printArea td{border:1px solid #333;padding:4px 7px;text-align:left;vertical-align:top}
+#printArea th{background:#e9f0fb}
+#printArea td.r,#printArea th.r{text-align:right}
+#printArea tr{page-break-inside:avoid}
+#printArea .sum{margin:8px 0 0 auto;width:250px}
+#printArea .rcpt{border:1.5px solid #0f3a7d;padding:10px 14px;margin-bottom:9mm;page-break-inside:avoid}
+#printArea .rcpt .sigs{margin-top:38px}
+#printArea .rcpt .cp{float:right;font-size:12px;border:1px solid #333;padding:0 8px;border-radius:4px}
+#printArea .foot{margin-top:10px;font-size:11px;color:#444;text-align:right}
+#printArea .kvt td:first-child{width:32%;font-weight:600;background:#f4f7fc}
+#printArea .ndet{font-size:15px}
