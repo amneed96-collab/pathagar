@@ -80,6 +80,8 @@ body.side-open .ov{opacity:1;pointer-events:auto}
 .stat.cash b{color:var(--lime);font-size:30px}
 .stat.due{border-left-color:var(--red)}
 .stat.due b{color:var(--red)}
+.stat.plus{border-left-color:#2e8b57}
+.stat.plus b{color:#1f7a45}
 
 /* ===== ফর্ম ===== */
 .fg{display:grid;grid-template-columns:1fr;gap:12px}
@@ -130,6 +132,24 @@ td.act{white-space:nowrap;text-align:right}
 .ib.del{color:var(--red)}
 .ib.del:hover{background:#fdecea}
 .ib:focus-visible{outline:2px solid var(--navy)}
+
+/* তালিকা: প্রতি সারিতে একটি তথ্য, কলামভিত্তিক (ছোট স্ক্রিনে পাশে স্ক্রল) */
+table.rt th,table.rt td{white-space:nowrap}
+table.rt td[data-l="ঠিকানা"],table.rt td[data-l="বিবরণ"],table.rt td[data-l="শিরোনাম"]{white-space:normal;min-width:170px}
+td.empty{white-space:normal!important;text-align:center}
+
+/* রিপোর্ট */
+.seg{display:flex;border:1.5px solid var(--navy);border-radius:10px;overflow:hidden}
+.seg button{flex:1;border:0;background:#fff;color:var(--navy);padding:10px 8px;font-weight:600;cursor:pointer;min-height:44px}
+.seg button+button{border-left:1.5px solid var(--navy)}
+.seg button.on{background:var(--navy);color:#fff}
+.seg button:focus-visible{outline:3px solid var(--lime);outline-offset:-3px}
+table.rep td:last-child,table.rep th:last-child{text-align:right}
+table.rep td:last-child{font-weight:700}
+table.rep tr.hi td{background:var(--navy-l);color:var(--navy)}
+table.rep tr.neg td:last-child{color:var(--red)}
+table.rep tr.pos td:last-child{color:#1f7a45}
+.rsub{margin:-6px 0 10px;color:var(--muted);font-size:14.5px}
 
 table.dyn td,table.dyn th{padding:6px 4px}
 table.dyn input{min-width:0;padding:8px 10px}
@@ -201,17 +221,8 @@ table.dyn td:last-child{width:44px}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 .toast.err{background:var(--red)}
 
-/* ===== মোবাইল: টেবিল কার্ডে রূপান্তর ===== */
+/* ===== মোবাইল ===== */
 @media (max-width:700px){
-  table.rt thead{display:none}
-  table.rt,table.rt tbody,table.rt tr,table.rt td{display:block;width:100%}
-  table.rt tr{border:1px solid var(--line);border-radius:12px;margin-bottom:10px;padding:8px 12px;background:#fff}
-  table.rt td{display:flex;justify-content:space-between;gap:14px;border:0;padding:4px 0;text-align:right}
-  table.rt td::before{content:attr(data-l);font-weight:600;color:var(--muted);text-align:left;flex:0 0 36%}
-  table.rt td.act{justify-content:flex-end;padding-top:8px}
-  table.rt td.act::before{display:none}
-  table.rt td.empty{display:block;text-align:center}
-  table.rt td.empty::before{display:none}
   table.dyn .c:first-child{width:22px}
   .tot{max-width:none}
 }
@@ -240,26 +251,35 @@ table.dyn td:last-child{width:44px}
   #printArea{display:block}
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
-#printArea .dh{display:flex;align-items:center;gap:14px;border-bottom:2px solid #0f3a7d;padding-bottom:8px;margin-bottom:10px}
-#printArea .dh img{width:64px;height:64px;object-fit:contain}
-#printArea .dh .tx{flex:1;text-align:center}
-#printArea .dh h1{margin:0;font-size:25px;color:#0f3a7d;line-height:1.25}
-#printArea .dh p{margin:1px 0;font-size:12.5px}
-#printArea .dh.sm img{width:46px;height:46px}
-#printArea .dh.sm h1{font-size:19px}
-#printArea .dh.sm p{font-size:11.5px}
-#printArea .dt{text-align:center;font-size:19px;font-weight:700;margin:10px 0}
-#printArea .dt.u span{border-bottom:2px solid #000;padding-bottom:1px}
-#printArea .meta{display:flex;justify-content:space-between;margin:6px 0 8px}
-#printArea table{width:100%;border-collapse:collapse}
-#printArea th,#printArea td{border:1px solid #333;padding:4px 7px;text-align:left;vertical-align:top}
-#printArea th{background:#e9f0fb}
-#printArea td.r,#printArea th.r{text-align:right}
-#printArea tr{page-break-inside:avoid}
-#printArea .sum{margin:8px 0 0 auto;width:250px}
-#printArea .rcpt{border:1.5px solid #0f3a7d;padding:10px 14px;margin-bottom:9mm;page-break-inside:avoid}
-#printArea .rcpt .sigs{margin-top:38px}
-#printArea .rcpt .cp{float:right;font-size:12px;border:1px solid #333;padding:0 8px;border-radius:4px}
-#printArea .foot{margin-top:10px;font-size:11px;color:#444;text-align:right}
-#printArea .kvt td:first-child{width:32%;font-weight:600;background:#f4f7fc}
-#printArea .ndet{font-size:15px}
+#printArea .dh,#shotArea .dh{display:flex;align-items:center;gap:14px;border-bottom:2px solid #0f3a7d;padding-bottom:8px;margin-bottom:10px}
+#printArea .dh img,#shotArea .dh img{width:64px;height:64px;object-fit:contain}
+#printArea .dh .tx,#shotArea .dh .tx{flex:1;text-align:center}
+#printArea .dh h1,#shotArea .dh h1{margin:0;font-size:25px;color:#0f3a7d;line-height:1.25}
+#printArea .dh p,#shotArea .dh p{margin:1px 0;font-size:12.5px}
+#printArea .dh.sm img,#shotArea .dh.sm img{width:46px;height:46px}
+#printArea .dh.sm h1,#shotArea .dh.sm h1{font-size:19px}
+#printArea .dh.sm p,#shotArea .dh.sm p{font-size:11.5px}
+#printArea .dt,#shotArea .dt{text-align:center;font-size:19px;font-weight:700;margin:10px 0}
+#printArea .dt.u span,#shotArea .dt.u span{border-bottom:2px solid #000;padding-bottom:1px}
+#printArea .meta,#shotArea .meta{display:flex;justify-content:space-between;margin:6px 0 8px}
+#printArea table,#shotArea table{width:100%;border-collapse:collapse}
+#printArea th,#printArea td,#shotArea th,#shotArea td{border:1px solid #333;padding:4px 7px;text-align:left;vertical-align:top}
+#printArea th,#shotArea th{background:#e9f0fb}
+#printArea td.r,#printArea th.r,#shotArea td.r,#shotArea th.r{text-align:right}
+#printArea tr,#shotArea tr{page-break-inside:avoid}
+#printArea .sum,#shotArea .sum{margin:8px 0 0 auto;width:250px}
+#printArea .rcpt,#shotArea .rcpt{border:1.5px solid #0f3a7d;padding:10px 14px;margin-bottom:9mm;page-break-inside:avoid}
+#printArea .rcpt .sigs,#shotArea .rcpt .sigs{margin-top:38px}
+#printArea .rcpt .cp,#shotArea .rcpt .cp{float:right;font-size:12px;border:1px solid #333;padding:0 8px;border-radius:4px}
+#printArea .foot,#shotArea .foot{margin-top:10px;font-size:11px;color:#444;text-align:right}
+#printArea .kvt td:first-child,#shotArea .kvt td:first-child{width:32%;font-weight:600;background:#f4f7fc}
+#printArea .ndet,#shotArea .ndet{font-size:15px}
+
+#shotArea{position:fixed;left:-10000px;top:0;width:720px;background:#fff;padding:14px;color:#000;pointer-events:none;
+  font-family:'Hind Siliguri','Noto Sans Bengali',sans-serif;font-size:13.5px;line-height:1.5}
+#shotArea .rcpt{margin-bottom:0}
+.sh-prev{width:100%;max-height:38vh;object-fit:contain;border:1px solid var(--line);border-radius:10px;background:#fff;margin-bottom:10px}
+.sh-stat{color:var(--muted);font-size:14px;min-height:22px;margin-bottom:6px}
+.sh-list{display:grid;gap:8px}
+.sh-list .btn{width:100%}
+.mbox.wide{max-width:420px;max-height:92vh;overflow-y:auto}

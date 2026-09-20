@@ -108,6 +108,7 @@
       <div class="tools">
         <input id="cSearch" placeholder="নাম, রশিদ নং বা ক্রম দিয়ে খুঁজুন" oninput="renderColl()">
         <button class="btn ghost" onclick="printCollList()"><i data-ic="print"></i> প্রিন্ট</button>
+        <button class="btn ghost" onclick="printDueList()"><i data-ic="bell"></i> বকেয়া তালিকা</button>
       </div>
       <div class="tw">
         <table class="rt">
@@ -190,6 +191,34 @@
         <table class="rt">
           <thead><tr><th>ভাউচার নং</th><th>তারিখ</th><th>সর্বমোট</th><th>পরিশোধ</th><th>বকেয়া</th><th></th></tr></thead>
           <tbody id="eBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- রিপোর্ট -->
+  <section class="page" id="pg-report">
+    <div class="ptop"><h2>রিপোর্ট</h2>
+      <button class="btn ghost" onclick="printReport()"><i data-ic="print"></i> প্রিন্ট</button>
+    </div>
+    <div class="card">
+      <div class="seg" id="rSeg">
+        <button class="on" data-t="month" onclick="setReportType('month')">মাসিক</button>
+        <button data-t="year" onclick="setReportType('year')">বাৎসরিক</button>
+        <button data-t="all" onclick="setReportType('all')">সর্বমোট</button>
+      </div>
+      <div class="fg" style="margin-top:12px">
+        <label id="rMonthWrap">মাস<select id="rMonth" onchange="renderReport()"></select></label>
+        <label id="rYearWrap">বছর<select id="rYear" onchange="renderReport()"></select></label>
+      </div>
+    </div>
+    <div class="card">
+      <h3 id="rTitle">রিপোর্ট</h3>
+      <div class="rsub" id="rSub"></div>
+      <div class="tw">
+        <table class="rt rep">
+          <thead><tr><th>বিবরণ</th><th>টাকা</th></tr></thead>
+          <tbody id="rBody"></tbody>
         </table>
       </div>
     </div>
@@ -321,6 +350,24 @@
 
 <!-- প্রিন্ট এলাকা -->
 <div id="printArea"></div>
+<div id="shotArea" aria-hidden="true"></div>
+
+<!-- শেয়ার মডাল -->
+<div class="modal" id="shareModal" onclick="if(event.target===this)closeShare()">
+  <div class="mbox wide">
+    <h3 id="shTitle">শেয়ার</h3>
+    <img id="shPrev" class="sh-prev" alt="রশিদের ছবি" style="display:none">
+    <div class="sh-stat" id="shStatus"></div>
+    <div class="sh-list">
+      <button class="btn" onclick="shareImage()"><i data-ic="share"></i> ছবি শেয়ার (imo, WhatsApp, Messenger, Email…)</button>
+      <button class="btn ghost" onclick="downloadShareImage()"><i data-ic="print"></i> ছবি ডাউনলোড (PNG)</button>
+      <button class="btn ghost" onclick="shareWhatsApp()"><i data-ic="phone"></i> WhatsApp-এ লেখা পাঠান</button>
+      <button class="btn ghost" onclick="shareEmail()"><i data-ic="mail"></i> Email-এ লেখা পাঠান</button>
+      <button class="btn ghost" onclick="closeShare()">বন্ধ করুন</button>
+    </div>
+    <p class="hint">imo বা Messenger-এ ছবি পাঠাতে প্রথম বাটনে ট্যাপ করে তালিকা থেকে অ্যাপটি বেছে নিন।</p>
+  </div>
+</div>
 
 <!-- পাসওয়ার্ড মডাল -->
 <div class="modal" id="pwModal" onclick="if(event.target===this)closePw()">
@@ -338,6 +385,7 @@
 <div id="loader"><span></span></div>
 <div id="toast" class="toast"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

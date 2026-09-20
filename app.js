@@ -53,6 +53,8 @@ const IC = {
   mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
   link: '<path d="M10 14a4 4 0 005.700 0l3-3a4 4 0 00-5.700-5.700l-1 1M14 10a4 4 0 00-5.700 0l-3 3a4 4 0 005.700 5.700l1-1"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  chart: '<path d="M4 20V4M4 20h16M8 16v-5M12 16V8M16 16v-3"/>',
+  share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.600 10.500l6.800-4M8.600 13.500l6.800 4"/>',
   wallet: '<path d="M3 7h16a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2zM3 7l12-3v3M16 13.500h2"/>'
 };
 const icon = (n, s = 20) => `<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${IC[n] || ''}</svg>`;
@@ -121,6 +123,7 @@ const MENU = [
   { g: 'members', t: 'সদস্য', i: 'users', ch: [{ id: 'memberEntry', t: 'সদস্য এন্ট্রি ফরম' }, { id: 'collection', t: 'সদস্য চাঁদা আদায়' }] },
   { id: 'special', t: 'বিশেষ', i: 'star' },
   { id: 'expense', t: 'খরচ', i: 'receipt' },
+  { id: 'report', t: 'রিপোর্ট', i: 'chart' },
   { id: 'committee', t: 'কমিটি', i: 'committee' },
   { id: 'notices', t: 'নোটিশ', i: 'bell' },
   { g: 'admin', t: 'ব্যবস্থাপনা', i: 'gear', lock: true, ch: [{ id: 'setup', t: 'সেটাপ ফরম' }, { id: 'committeeForm', t: 'কমিটি ফরম' }, { id: 'noticeForm', t: 'নোটিশ ফরম' }] }
@@ -185,7 +188,7 @@ function lockNow(silent) {
 function refreshAll() {
   renderChrome(); renderDashboard();
   renderMembers(); fillMemberSelect(); renderColl(); renderSpecial(); renderExp();
-  renderAbout(); renderCommittee(); renderNotices();
+  renderAbout(); renderCommittee(); renderNotices(); fillReportYears(); renderReport();
   refreshNos();
 }
 function refreshNos() {
@@ -232,12 +235,14 @@ function renderDashboard() {
   const special = sum(S.special, 'amount');
   const spent = sum(S.expenses, 'paid');
   const cash = collected + special - spent;
+  const net = collected + special - spent;
   const cards = [
     { l: 'মোট সদস্য', v: bn(S.members.length) + ' জন', i: 'users' },
     { l: 'মোট ধার্য্য', v: taka(assessed), i: 'org' },
     { l: 'মোট আদায়', v: taka(collected), i: 'coin' },
     { l: 'মোট বকেয়া', v: taka(due), i: 'bell', c: 'due' },
     { l: 'মোট খরচ', v: taka(spent), i: 'receipt' },
+    { l: net >= 0 ? 'উদ্বৃত্ত' : 'ঘাটতি', v: taka(Math.abs(net)), i: 'chart', c: net >= 0 ? 'plus' : 'due' },
     { l: 'বর্তমান ক্যাশ', v: taka(cash), i: 'wallet', c: 'cash', s: 'সদস্য আদায় + বিশেষ কালেকশন − খরচ' }
   ];
   $('stats').innerHTML = cards.map(c => `<div class="stat ${c.c || ''}"><span>${icon(c.i === 'coin' ? 'receipt' : c.i, 18)}${c.l}</span><b>${c.v}</b>${c.s ? `<small>${c.s}</small>` : ''}</div>`).join('');
@@ -439,13 +444,13 @@ function renderColl() {
   $('cBody').innerHTML = rows.length ? rows.map(c => `<tr>
     <td data-l="রশিদ নং">${bn(c.receiptNo)}</td><td data-l="তারিখ">${fdate(c.date)}</td><td data-l="নাম"><b>${esc(collName(c))}</b></td>
     <td data-l="ক্রম">${bn(c.serial)}</td><td data-l="ধার্য্য">${taka(c.fee)}</td><td data-l="পূর্ব বকেয়া">${taka(c.dueBefore)}</td><td data-l="পরিশোধ"><b>${taka(c.paid)}</b></td>
-    <td class="act"><button class="ib" title="এডিট" onclick="editColl('${c.id}')">${icon('edit', 17)}</button><button class="ib" title="প্রিন্ট" onclick="printReceipt('${c.id}')">${icon('print', 17)}</button><button class="ib del" title="ডিলেট" onclick="delColl('${c.id}')">${icon('trash', 17)}</button></td></tr>`).join('')
+    <td class="act"><button class="ib" title="এডিট" onclick="editColl('${c.id}')">${icon('edit', 17)}</button><button class="ib" title="প্রিন্ট" onclick="printReceipt('${c.id}')">${icon('print', 17)}</button><button class="ib" title="শেয়ার" onclick="openShare('coll','${c.id}')">${icon('share', 17)}</button><button class="ib del" title="ডিলেট" onclick="delColl('${c.id}')">${icon('trash', 17)}</button></td></tr>`).join('')
     : '<tr><td colspan="8" class="empty">কোনো আদায় পাওয়া যায়নি</td></tr>';
 }
 function receiptHtml(c, copy) {
   const remain = num(c.dueBefore) - num(c.paid);
   return `<div class="rcpt">${docHeader(true)}
-    <div class="dt u" style="margin:4px 0"><span>জমা রশিদ</span><span class="cp">${copy}</span></div>
+    <div class="dt u" style="margin:4px 0"><span>জমা রশিদ</span>${copy ? `<span class="cp">${copy}</span>` : ''}</div>
     <div class="meta"><span>রশিদ নং: <b>${bn(c.receiptNo)}</b></span><span>তারিখ: <b>${fdate(c.date)}</b></span></div>
     <table class="kvt">
       <tr><td>সদস্যের নাম</td><td>${esc(collName(c))} (ক্রম: ${bn(c.serial)})</td></tr>
@@ -458,7 +463,7 @@ function receiptHtml(c, copy) {
 }
 function printReceipt(id) {
   const c = S.collections.find(x => x.id === id); if (!c) return;
-  printDoc(receiptHtml(c, 'সদস্য কপি') + receiptHtml(c, 'অফিস কপি'));
+  printDoc(receiptHtml(c, ''));
 }
 function printCollList() {
   const rows = S.collections.slice().sort(byNoDesc('receiptNo')).reverse();
@@ -466,6 +471,23 @@ function printCollList() {
     <table><thead><tr><th>রশিদ নং</th><th>তারিখ</th><th>নাম</th><th>ক্রম</th><th class="r">ধার্য্য</th><th class="r">পূর্ব বকেয়া</th><th class="r">পরিশোধ</th></tr></thead><tbody>
     ${rows.map(c => `<tr><td>${bn(c.receiptNo)}</td><td>${fdate(c.date)}</td><td>${esc(collName(c))}</td><td>${bn(c.serial)}</td><td class="r">${bn(num(c.fee))}</td><td class="r">${bn(num(c.dueBefore))}</td><td class="r">${bn(num(c.paid))}</td></tr>`).join('')}
     <tr><td colspan="6" class="r"><b>সর্বমোট</b></td><td class="r"><b>${taka(sum(rows, 'paid'))}</b></td></tr>
+    </tbody></table>${listFoot()}`);
+}
+
+
+function printDueList() {
+  const t = todayISO();
+  const rows = S.members.slice().sort(bySerial).map(m => {
+    const total = calcAssessed(m, t), paid = paidBy(m.id);
+    return { m, total, paid, due: total - paid };
+  }).filter(r => r.due > 0);
+  if (!rows.length) { toast('কোনো সদস্যের বকেয়া নেই'); return; }
+  const tot = k => rows.reduce((s, r) => s + r[k], 0);
+  printDoc(docHeader() + `<div class="dt u"><span>সদস্যভিত্তিক বকেয়া তালিকা</span></div>
+    <div class="meta"><span>বকেয়া সদস্য: ${bn(rows.length)} জন</span><span>তারিখ: ${fdate(t)}</span></div>
+    <table><thead><tr><th>ক্রম</th><th>নাম</th><th>মোবাইল নং</th><th class="r">ধার্য্য</th><th class="r">মোট</th><th class="r">পরিশোধ</th><th class="r">বকেয়া</th></tr></thead><tbody>
+    ${rows.map(r => `<tr><td>${bn(r.m.serial)}</td><td>${esc(r.m.name)}</td><td>${bn(esc(r.m.mobile))}</td><td class="r">${bn(num(r.m.fee))}</td><td class="r">${bn(r.total)}</td><td class="r">${bn(r.paid)}</td><td class="r"><b>${bn(r.due)}</b></td></tr>`).join('')}
+    <tr><td colspan="4" class="r"><b>সর্বমোট</b></td><td class="r"><b>${bn(tot('total'))}</b></td><td class="r"><b>${bn(tot('paid'))}</b></td><td class="r"><b>${bn(tot('due'))}</b></td></tr>
     </tbody></table>${listFoot()}`);
 }
 
@@ -514,12 +536,12 @@ function renderSpecial() {
   $('sBody').innerHTML = rows.length ? rows.map(x => `<tr>
     <td data-l="রশিদ নং">${bn(x.receiptNo)}</td><td data-l="তারিখ">${fdate(x.date)}</td><td data-l="নাম"><b>${esc(x.name)}</b></td>
     <td data-l="মোবাইল">${bn(esc(x.mobile))}</td><td data-l="বিবরণ">${esc(x.description)}</td><td data-l="টাকা"><b>${taka(x.amount)}</b></td>
-    <td class="act"><button class="ib" title="এডিট" onclick="editSpecial('${x.id}')">${icon('edit', 17)}</button><button class="ib" title="প্রিন্ট" onclick="printSpecial('${x.id}')">${icon('print', 17)}</button><button class="ib del" title="ডিলেট" onclick="delSpecial('${x.id}')">${icon('trash', 17)}</button></td></tr>`).join('')
+    <td class="act"><button class="ib" title="এডিট" onclick="editSpecial('${x.id}')">${icon('edit', 17)}</button><button class="ib" title="প্রিন্ট" onclick="printSpecial('${x.id}')">${icon('print', 17)}</button><button class="ib" title="শেয়ার" onclick="openShare('special','${x.id}')">${icon('share', 17)}</button><button class="ib del" title="ডিলেট" onclick="delSpecial('${x.id}')">${icon('trash', 17)}</button></td></tr>`).join('')
     : '<tr><td colspan="7" class="empty">কোনো রেকর্ড পাওয়া যায়নি</td></tr>';
 }
 function specialHtml(x, copy) {
   return `<div class="rcpt">${docHeader(true)}
-    <div class="dt u" style="margin:4px 0"><span>বিশেষ কালেকশন রশিদ</span><span class="cp">${copy}</span></div>
+    <div class="dt u" style="margin:4px 0"><span>বিশেষ কালেকশন রশিদ</span>${copy ? `<span class="cp">${copy}</span>` : ''}</div>
     <div class="meta"><span>রশিদ নং: <b>${bn(x.receiptNo)}</b></span><span>তারিখ: <b>${fdate(x.date)}</b></span></div>
     <table class="kvt">
       <tr><td>নাম</td><td>${esc(x.name)}</td></tr>
@@ -532,7 +554,7 @@ function specialHtml(x, copy) {
 }
 function printSpecial(id) {
   const x = S.special.find(v => v.id === id); if (!x) return;
-  printDoc(specialHtml(x, 'প্রদানকারীর কপি') + specialHtml(x, 'অফিস কপি'));
+  printDoc(specialHtml(x, ''));
 }
 function printSpecialList() {
   const rows = S.special.slice().sort(byNoDesc('receiptNo')).reverse();
@@ -541,6 +563,95 @@ function printSpecialList() {
     ${rows.map(x => `<tr><td>${bn(x.receiptNo)}</td><td>${fdate(x.date)}</td><td>${esc(x.name)}</td><td>${bn(esc(x.mobile))}</td><td>${esc(x.address)}</td><td>${esc(x.description)}</td><td class="r">${bn(num(x.amount))}</td></tr>`).join('')}
     <tr><td colspan="6" class="r"><b>সর্বমোট</b></td><td class="r"><b>${taka(sum(rows, 'amount'))}</b></td></tr>
     </tbody></table>${listFoot()}`);
+}
+
+/* =====================================================================
+   রশিদ শেয়ার (ছবি / লেখা)
+   ===================================================================== */
+let shareCtx = null;
+const waNum = m => { let d = en(m).replace(/\D/g, ''); if (d.length === 11 && d.indexOf('01') === 0) d = '88' + d; return d; };
+
+function receiptInfo(kind, id) {
+  const org = S.settings.name || 'সংস্থা';
+  if (kind === 'coll') {
+    const c = S.collections.find(x => x.id === id); if (!c) return null;
+    return {
+      html: receiptHtml(c, ''), title: 'জমা রশিদ নং ' + bn(c.receiptNo), name: 'receipt-' + en(c.receiptNo), mobile: c.mobile,
+      text: `${org}\nজমা রশিদ নং: ${bn(c.receiptNo)}\nতারিখ: ${fdate(c.date)}\nসদস্য: ${collName(c)} (ক্রম: ${bn(c.serial)})\nপরিশোধ: ${taka(c.paid)}\nঅবশিষ্ট বকেয়া: ${taka(num(c.dueBefore) - num(c.paid))}\nধন্যবাদ।`
+    };
+  }
+  const x = S.special.find(v => v.id === id); if (!x) return null;
+  return {
+    html: specialHtml(x, ''), title: 'বিশেষ কালেকশন রশিদ নং ' + bn(x.receiptNo), name: 'special-receipt-' + en(x.receiptNo), mobile: x.mobile,
+    text: `${org}\nবিশেষ কালেকশন রশিদ নং: ${bn(x.receiptNo)}\nতারিখ: ${fdate(x.date)}\nনাম: ${x.name}\nবিবরণ: ${x.description}\nটাকা: ${taka(x.amount)}\nধন্যবাদ।`
+  };
+}
+async function makeShareImage(info) {
+  if (typeof html2canvas === 'undefined') return null;
+  const box = $('shotArea');
+  box.innerHTML = info.html;
+  try {
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    const cv = await html2canvas(box, {
+      scale: 2, backgroundColor: '#ffffff', useCORS: true,
+      onclone: d => { const e = d.getElementById('shotArea'); if (e) { e.style.position = 'absolute'; e.style.left = '0'; e.style.top = '0'; } }
+    });
+    const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
+    return blob ? { blob } : null;
+  } catch (e) { return null; }
+  finally { box.innerHTML = ''; }
+}
+function openShare(kind, id) {
+  const info = receiptInfo(kind, id); if (!info) return;
+  closeShare();
+  const ctx = shareCtx = { info, img: null, url: '' };
+  $('shTitle').textContent = info.title;
+  $('shPrev').style.display = 'none';
+  $('shStatus').textContent = 'ছবি তৈরি হচ্ছে…';
+  $('shareModal').classList.add('show');
+  ctx.p = makeShareImage(info).then(img => {
+    if (shareCtx !== ctx) return img;
+    if (img) {
+      ctx.img = img; ctx.url = URL.createObjectURL(img.blob);
+      $('shPrev').src = ctx.url; $('shPrev').style.display = ''; $('shStatus').textContent = '';
+    } else {
+      $('shStatus').textContent = 'ছবি তৈরি হয়নি (ইন্টারনেট সংযোগ দেখুন)। লেখা আকারে পাঠাতে পারবেন।';
+    }
+    return img;
+  });
+}
+function closeShare() {
+  if (shareCtx && shareCtx.url) URL.revokeObjectURL(shareCtx.url);
+  shareCtx = null;
+  const m = $('shareModal'); if (m) m.classList.remove('show');
+}
+function downloadShareImage() {
+  if (!shareCtx || !shareCtx.img) { toast('ছবি এখনও তৈরি হয়নি', true); return; }
+  const a = document.createElement('a');
+  a.href = shareCtx.url; a.download = shareCtx.info.name + '.png';
+  document.body.appendChild(a); a.click(); a.remove();
+}
+async function shareImage() {
+  if (!shareCtx) return;
+  const info = shareCtx.info, img = shareCtx.img || await shareCtx.p;
+  if (!img) { toast('ছবি তৈরি হয়নি', true); return; }
+  const file = new File([img.blob], info.name + '.png', { type: 'image/png' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: info.title, text: info.text }); }
+    catch (e) { if (e.name !== 'AbortError') toast('শেয়ার করা যায়নি', true); }
+  } else {
+    downloadShareImage();
+    toast('এই ডিভাইস/ব্রাউজারে সরাসরি শেয়ার হয় না। ছবি ডাউনলোড হয়েছে, অ্যাপ থেকে পাঠান।');
+  }
+}
+function shareWhatsApp() {
+  if (!shareCtx) return;
+  const n = shareCtx.info.mobile ? waNum(shareCtx.info.mobile) : '';
+  window.open('https://wa.me/' + n + '?text=' + encodeURIComponent(shareCtx.info.text), '_blank');
+}
+function shareEmail() {
+  if (!shareCtx) return;
+  location.href = 'mailto:?subject=' + encodeURIComponent(shareCtx.info.title) + '&body=' + encodeURIComponent(shareCtx.info.text);
 }
 
 /* =====================================================================
@@ -644,6 +755,87 @@ function printExpList() {
     ${rows.map(x => `<tr><td>${bn(x.voucherNo)}</td><td>${fdate(x.date)}</td><td>${esc(parseJ(x.items, []).map(i => i.d).filter(Boolean).join(', '))}</td><td class="r">${bn(num(x.total))}</td><td class="r">${bn(num(x.paid))}</td><td class="r">${bn(num(x.due))}</td></tr>`).join('')}
     <tr><td colspan="3" class="r"><b>সর্বমোট</b></td><td class="r"><b>${bn(sum(rows, 'total'))}</b></td><td class="r"><b>${bn(sum(rows, 'paid'))}</b></td><td class="r"><b>${bn(sum(rows, 'due'))}</b></td></tr>
     </tbody></table>${listFoot()}`);
+}
+
+/* =====================================================================
+   রিপোর্ট (মাসিক / বাৎসরিক / সর্বমোট)
+   ===================================================================== */
+const MONTHS = ['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
+let repType = 'month';
+const monthIdx = iso => { const p = String(iso || '').split('-').map(Number); return (p[0] && p[1]) ? p[0] * 12 + p[1] - 1 : null; };
+
+function initReport() {
+  $('rMonth').innerHTML = MONTHS.map((n, i) => `<option value="${i + 1}">${n}</option>`).join('');
+  $('rMonth').value = String(new Date().getMonth() + 1);
+  fillReportYears();
+  setReportType('month');
+}
+function fillReportYears() {
+  const cur = new Date().getFullYear();
+  let min = cur;
+  [S.members, S.collections, S.special, S.expenses].forEach(l => l.forEach(x => { const y = parseInt(x.date); if (y && y > 1990 && y < min) min = y; }));
+  const sel = $('rYear'), keep = sel.value || String(cur);
+  let o = '';
+  for (let y = cur; y >= min; y--) o += `<option value="${y}">${bn(y)}</option>`;
+  sel.innerHTML = o; sel.value = keep;
+  if (sel.value !== keep) sel.value = String(cur);
+}
+function setReportType(t) {
+  repType = t;
+  document.querySelectorAll('#rSeg button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  $('rMonthWrap').style.display = t === 'month' ? '' : 'none';
+  $('rYearWrap').style.display = t === 'all' ? 'none' : '';
+  renderReport();
+}
+function reportCalc(type, y, m) {
+  const now = monthIdx(todayISO());
+  let ps = -Infinity, pe = Infinity;
+  if (type === 'month') { ps = pe = y * 12 + m - 1; }
+  else if (type === 'year') { ps = y * 12; pe = y * 12 + 11; }
+  const inR = iso => { const i = monthIdx(iso); return i !== null && i >= ps && i <= pe; };
+  const before = iso => { const i = monthIdx(iso); return i !== null && i < ps; };
+  let assessed = 0, due = 0;
+  S.members.forEach(mm => {
+    const js = monthIdx(mm.date); if (js === null) return;
+    const a = Math.max(0, Math.min(pe, now) - Math.max(ps, js) + 1) * num(mm.fee);
+    const p = S.collections.filter(c => c.memberId === mm.id && inR(c.date)).reduce((s, c) => s + num(c.paid), 0);
+    assessed += a; due += Math.max(0, a - p);
+  });
+  const coll = sum(S.collections.filter(c => inR(c.date)), 'paid');
+  const spec = sum(S.special.filter(x => inR(x.date)), 'amount');
+  const exp = sum(S.expenses.filter(x => inR(x.date)), 'paid');
+  const open = type === 'all' ? 0 :
+    sum(S.collections.filter(c => before(c.date)), 'paid') + sum(S.special.filter(x => before(x.date)), 'amount') - sum(S.expenses.filter(x => before(x.date)), 'paid');
+  const income = coll + spec;
+  return { assessed, coll, spec, due, exp, open, cash: open + income - exp, net: income - exp };
+}
+function reportView() {
+  const y = parseInt($('rYear').value) || new Date().getFullYear(), m = parseInt($('rMonth').value) || 1;
+  const r = reportCalc(repType, y, m), periodic = repType !== 'all';
+  const meta = {
+    month: { t: 'মাসিক রিপোর্ট', s: MONTHS[m - 1] + ' ' + bn(y) },
+    year: { t: 'বাৎসরিক রিপোর্ট', s: bn(y) + ' সাল' },
+    all: { t: 'সর্বমোট রিপোর্ট', s: 'শুরু থেকে ' + fdate(todayISO()) + ' পর্যন্ত' }
+  }[repType];
+  const rows = [['মোট ধার্য্য', r.assessed, ''], ['মোট আদায়', r.coll, ''], ['বিশেষ কালেকশন', r.spec, ''], ['মোট বকেয়া', r.due, ''], ['মোট খরচ', r.exp, ''], [r.net >= 0 ? 'উদ্বৃত্ত' : 'ঘাটতি', Math.abs(r.net), r.net >= 0 ? 'pos' : 'neg']];
+  if (periodic) rows.push(['পূর্বের জের (ক্যাশ)', r.open, r.open < 0 ? 'neg' : '']);
+  rows.push([periodic ? 'মেয়াদ শেষে ক্যাশ' : 'বর্তমান ক্যাশ', r.cash, 'hi' + (r.cash < 0 ? ' neg' : '')]);
+  return { meta, rows };
+}
+function renderReport() {
+  if (!$('rBody')) return;
+  const v = reportView();
+  $('rTitle').textContent = v.meta.t;
+  $('rSub').textContent = v.meta.s;
+  $('rBody').innerHTML = v.rows.map(r => `<tr class="${r[2]}"><td data-l="বিবরণ">${r[0]}</td><td data-l="টাকা">${taka(r[1])}</td></tr>`).join('');
+}
+function printReport() {
+  const v = reportView();
+  printDoc(docHeader() + `<div class="dt u"><span>${v.meta.t}</span></div>
+    <div class="meta"><span>সময়কাল: <b>${v.meta.s}</b></span><span>তারিখ: ${fdate(todayISO())}</span></div>
+    <table><thead><tr><th style="width:60px">ক্রম</th><th>বিবরণ</th><th class="r" style="width:160px">টাকা</th></tr></thead><tbody>
+    ${v.rows.map((r, i) => `<tr><td>${bn(i + 1)}</td><td>${r[0]}</td><td class="r"><b>${taka(r[1])}</b></td></tr>`).join('')}
+    </tbody></table>${sigBlock('ক্যাশিয়ার', 'সভাপতি')}${listFoot()}`);
 }
 
 /* =====================================================================
@@ -807,9 +999,9 @@ function renderNoticeAdmin() {
 function hydrateIcons() {
   document.querySelectorAll('i[data-ic]').forEach(e => { e.outerHTML = icon(e.dataset.ic, 18); });
 }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeSide(); closePw(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeSide(); closePw(); closeShare(); } });
 document.addEventListener('DOMContentLoaded', () => {
   hydrateIcons(); buildMenu();
-  resetMemberForm(); resetCollForm(); resetSpecialForm(); resetExpForm();
+  resetMemberForm(); resetCollForm(); resetSpecialForm(); resetExpForm(); initReport();
   loadData();
 });
