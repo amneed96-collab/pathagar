@@ -283,3 +283,14 @@ table.dyn td:last-child{width:44px}
 .sh-list{display:grid;gap:8px}
 .sh-list .btn{width:100%}
 .mbox.wide{max-width:420px;max-height:92vh;overflow-y:auto}
+
+/* ক্যাশ রিপোর্ট / লেজার: আয়-ব্যয় পাশাপাশি */
+table.sbs{min-width:620px}
+table.sbs th.c{text-align:center}
+table.sbs td.r,table.sbs th.r{text-align:right}
+table.sbs td.gap,table.sbs th.gap{width:14px;min-width:14px;padding:0;border:0!important;background:none!important}
+table.sbs tr.grp td{background:var(--navy);color:#fff;font-weight:700}
+table.sbs tr.sub td{background:var(--navy-l);font-weight:600;color:var(--navy)}
+table.sbs tr.sub td.gap{background:none}
+table.sbs tr.tt td{background:var(--navy-l);font-weight:700;color:var(--navy)}
+table.sbs tr.tt td.gap{background:none}

@@ -132,7 +132,7 @@ const MENU = [
   { g: 'members', t: 'সদস্য', i: 'users', ch: [{ id: 'memberEntry', t: 'সদস্য এন্ট্রি ফরম' }, { id: 'collection', t: 'সদস্য চাঁদা আদায়' }] },
   { id: 'special', t: 'বিশেষ', i: 'star' },
   { id: 'expense', t: 'খরচ', i: 'receipt' },
-  { id: 'report', t: 'রিপোর্ট', i: 'chart' },
+  { g: 'reports', t: 'রিপোর্ট', i: 'chart', ch: [{ id: 'report', t: 'শর্ট রিপোর্ট' }, { id: 'cashReport', t: 'ক্যাশ রিপোর্ট' }, { id: 'ledger', t: 'লেজার' }] },
   { id: 'committee', t: 'কমিটি', i: 'committee' },
   { id: 'notices', t: 'নোটিশ', i: 'bell' },
   { g: 'admin', t: 'ব্যবস্থাপনা', i: 'gear', lock: true, ch: [{ id: 'setup', t: 'সেটাপ ফরম' }, { id: 'committeeForm', t: 'কমিটি ফরম' }, { id: 'noticeForm', t: 'নোটিশ ফরম' }] }
@@ -197,7 +197,7 @@ function lockNow(silent) {
 function refreshAll() {
   renderChrome(); renderDashboard();
   renderMembers(); fillMemberSelect(); renderColl(); renderSpecial(); renderExp();
-  renderAbout(); renderCommittee(); renderNotices(); fillReportYears(); renderReport();
+  renderAbout(); renderCommittee(); renderNotices(); fillReportYears(); renderReport(); renderCash(); renderLedger();
   refreshNos();
 }
 function refreshNos() {
@@ -781,16 +781,18 @@ function initReport() {
   fillReportYears();
   setReportType('month');
 }
-function fillReportYears() {
+function fillYearSel(id) {
+  const sel = $(id); if (!sel) return;
   const cur = new Date().getFullYear();
   let min = cur;
   [S.members, S.collections, S.special, S.expenses].forEach(l => l.forEach(x => { const y = parseInt(x.date); if (y && y > 1990 && y < min) min = y; }));
-  const sel = $('rYear'), keep = sel.value || String(cur);
+  const keep = sel.value || String(cur);
   let o = '';
   for (let y = cur; y >= min; y--) o += `<option value="${y}">${bn(y)}</option>`;
   sel.innerHTML = o; sel.value = keep;
   if (sel.value !== keep) sel.value = String(cur);
 }
+function fillReportYears() { ['rYear', 'crYear', 'lgYear'].forEach(fillYearSel); }
 function setReportType(t) {
   repType = t;
   document.querySelectorAll('#rSeg button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
@@ -848,6 +850,154 @@ function printReport() {
     <table><thead><tr><th style="width:60px">ক্রম</th><th>বিবরণ</th><th class="r" style="width:160px">টাকা</th></tr></thead><tbody>
     ${v.rows.map((r, i) => `<tr><td>${bn(i + 1)}</td><td>${r[0]}</td><td class="r"><b>${taka(r[1])}</b></td></tr>`).join('')}
     </tbody></table><div class="foot" style="text-align:left">${REPORT_NOTE}</div>${sigBlock('ক্যাশিয়ার', 'সভাপতি')}${listFoot()}`);
+}
+
+/* =====================================================================
+   ক্যাশ রিপোর্ট ও লেজার
+   ===================================================================== */
+const RP = { cr: { type: 'month' }, lg: { type: 'month' } };
+const amt = v => bn(num(v).toLocaleString('en-IN'));
+
+function buildCtl(p) {
+  return `<div class="seg" id="${p}Seg">
+    <button class="on" data-t="month" onclick="setRp('${p}','month')">মাসিক</button>
+    <button data-t="year" onclick="setRp('${p}','year')">বাৎসরিক</button>
+    <button data-t="all" onclick="setRp('${p}','all')">সর্বমোট</button></div>
+    <div class="fg" style="margin-top:12px">
+      <label id="${p}MonthWrap">মাস<select id="${p}Month" onchange="renderRp('${p}')"></select></label>
+      <label id="${p}YearWrap">বছর<select id="${p}Year" onchange="renderRp('${p}')"></select></label></div>`;
+}
+function initRp(p) {
+  $(p + 'Ctl').innerHTML = buildCtl(p);
+  $(p + 'Month').innerHTML = MONTHS.map((n, i) => `<option value="${i + 1}">${n}</option>`).join('');
+  $(p + 'Month').value = String(new Date().getMonth() + 1);
+  fillYearSel(p + 'Year');
+}
+function setRp(p, t) {
+  RP[p].type = t;
+  document.querySelectorAll('#' + p + 'Seg button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  $(p + 'MonthWrap').style.display = t === 'month' ? '' : 'none';
+  $(p + 'YearWrap').style.display = t === 'all' ? 'none' : '';
+  renderRp(p);
+}
+function renderRp(p) { if (p === 'cr') renderCash(); else renderLedger(); }
+function rpSel(p) {
+  return { type: RP[p].type, y: parseInt($(p + 'Year').value) || new Date().getFullYear(), m: parseInt($(p + 'Month').value) || 1 };
+}
+function rpMeta(p, s) {
+  const base = p === 'cr' ? 'ক্যাশ রিপোর্ট' : 'লেজার';
+  const tl = { month: 'মাসিক', year: 'বাৎসরিক', all: 'সর্বমোট' }[s.type];
+  const sub = { month: MONTHS[s.m - 1] + ' ' + bn(s.y), year: bn(s.y) + ' সাল', all: 'শুরু থেকে ' + fdate(todayISO()) + ' পর্যন্ত' }[s.type];
+  return { title: base + ' (' + tl + ')', sub };
+}
+
+// আয় ও ব্যয়ের সব এন্ট্রি
+function rpEntries() {
+  const inc = [], exp = [];
+  S.collections.forEach(c => inc.push({
+    d: c.date, no: bn(c.receiptNo), n: parseInt(c.receiptNo) || 0, ord: 0, head: 'সদস্য চাঁদা',
+    desc: collName(c) + ' (' + c.memberId + ') — সদস্য চাঁদা', amt: num(c.paid)
+  }));
+  S.special.forEach(x => inc.push({
+    d: x.date, no: 'বি-' + bn(x.receiptNo), n: parseInt(x.receiptNo) || 0, ord: 1,
+    head: (x.description || '').trim() || 'বিশেষ কালেকশন', desc: x.name + (x.description ? ' — ' + x.description : ''), amt: num(x.amount)
+  }));
+  S.expenses.forEach(v => {
+    const n = parseInt(v.voucherNo) || 0;
+    parseJ(v.items, []).forEach(i => {
+      const h = (i.d || '').trim() || 'অন্যান্য';
+      exp.push({ d: v.date, no: bn(v.voucherNo), n, ord: 0, head: h, desc: h, amt: num(i.a) });
+    });
+    if (num(v.due) > 0) exp.push({ d: v.date, no: bn(v.voucherNo), n, ord: 1, head: 'অপরিশোধিত বকেয়া (বাদ)', desc: 'অপরিশোধিত বকেয়া (বাদ)', amt: -num(v.due) });
+  });
+  const cmp = (a, b) => (a.d || '').localeCompare(b.d || '') || a.ord - b.ord || a.n - b.n;
+  return { inc: inc.sort(cmp), exp: exp.sort(cmp) };
+}
+function inPeriod(e, s) {
+  const i = monthIdx(e.d); if (i === null) return false;
+  if (s.type === 'month') return i === s.y * 12 + s.m - 1;
+  if (s.type === 'year') return i >= s.y * 12 && i <= s.y * 12 + 11;
+  return true;
+}
+
+const SBS_GAP = '<td class="gap"></td>';
+function netRow(ti, te, cols) {
+  return `<tr class="tt"><td colspan="${cols}" class="r">${ti >= te ? 'উদ্বৃত্ত' : 'ঘাটতি'} (আয় − ব্যয়): ${taka(Math.abs(ti - te))}</td></tr>`;
+}
+function cashHtml(s) {
+  const e = rpEntries(), inc = e.inc.filter(x => inPeriod(x, s)), exp = e.exp.filter(x => inPeriod(x, s));
+  const n = Math.max(inc.length, exp.length);
+  if (!n) return '<div class="empty">এই সময়ে কোনো লেনদেন নেই</div>';
+  let r = '';
+  for (let i = 0; i < n; i++) {
+    const a = inc[i], b = exp[i];
+    r += `<tr><td>${a ? a.no : ''}</td><td>${a ? esc(a.desc) : ''}</td><td class="r">${a ? amt(a.amt) : ''}</td>${SBS_GAP}<td>${b ? b.no : ''}</td><td>${b ? esc(b.desc) : ''}</td><td class="r">${b ? amt(b.amt) : ''}</td></tr>`;
+  }
+  const ti = sum(inc, 'amt'), te = sum(exp, 'amt');
+  return `<table class="sbs"><thead>
+    <tr><th colspan="3" class="c">আয়</th><th class="gap"></th><th colspan="3" class="c">ব্যয়</th></tr>
+    <tr><th>রশিদ নং</th><th>বিবরণ</th><th class="r">টাকা</th><th class="gap"></th><th>ভাউচার নং</th><th>বিবরণ</th><th class="r">টাকা</th></tr></thead>
+    <tbody>${r}
+    <tr class="tt"><td colspan="2" class="r">সর্বমোট আয়</td><td class="r">${amt(ti)}</td>${SBS_GAP}<td colspan="2" class="r">সর্বমোট ব্যয়</td><td class="r">${amt(te)}</td></tr>
+    ${netRow(ti, te, 7)}</tbody></table>`;
+}
+function renderCash() {
+  if (!$('crOut')) return;
+  const s = rpSel('cr'), m = rpMeta('cr', s);
+  $('crTitle').textContent = m.title; $('crSub').textContent = m.sub;
+  $('crOut').innerHTML = cashHtml(s);
+}
+
+// লেজার: খাতভিত্তিক মোট
+function ledgerGroups(s) {
+  const e = rpEntries();
+  const agg = list => { const mp = {}; list.forEach(x => { mp[x.head] = (mp[x.head] || 0) + x.amt; }); return Object.keys(mp).map(k => [k, mp[k]]).sort((a, b) => b[1] - a[1]); };
+  if (s.type === 'month') {
+    const f = x => inPeriod(x, s);
+    return [{ label: '', inc: agg(e.inc.filter(f)), exp: agg(e.exp.filter(f)) }];
+  }
+  const keyOf = s.type === 'year' ? x => monthIdx(x.d) : x => Math.floor(monthIdx(x.d) / 12);
+  const ki = e.inc.filter(x => inPeriod(x, s)), ke = e.exp.filter(x => inPeriod(x, s));
+  const keys = Array.from(new Set(ki.concat(ke).map(keyOf))).sort((a, b) => a - b);
+  return keys.map(k => ({
+    label: s.type === 'year' ? MONTHS[k % 12] + ' ' + bn(s.y) : bn(k) + ' সাল',
+    inc: agg(ki.filter(x => keyOf(x) === k)), exp: agg(ke.filter(x => keyOf(x) === k))
+  }));
+}
+function ledgerHtml(s) {
+  const groups = ledgerGroups(s);
+  if (!groups.length || groups.every(g => !g.inc.length && !g.exp.length)) return '<div class="empty">এই সময়ে কোনো লেনদেন নেই</div>';
+  const tot = l => l.reduce((a, r) => a + r[1], 0);
+  let ti = 0, te = 0, r = '';
+  groups.forEach(g => {
+    if (g.label) r += `<tr class="grp"><td colspan="5">${g.label}</td></tr>`;
+    const n = Math.max(g.inc.length, g.exp.length);
+    for (let i = 0; i < n; i++) {
+      const a = g.inc[i], b = g.exp[i];
+      r += `<tr><td>${a ? esc(a[0]) : ''}</td><td class="r">${a ? amt(a[1]) : ''}</td>${SBS_GAP}<td>${b ? esc(b[0]) : ''}</td><td class="r">${b ? amt(b[1]) : ''}</td></tr>`;
+    }
+    const gi = tot(g.inc), ge = tot(g.exp); ti += gi; te += ge;
+    if (g.label) r += `<tr class="sub"><td class="r">মোট আয়</td><td class="r">${amt(gi)}</td>${SBS_GAP}<td class="r">মোট ব্যয়</td><td class="r">${amt(ge)}</td></tr>`;
+  });
+  return `<table class="sbs"><thead>
+    <tr><th colspan="2" class="c">আয়</th><th class="gap"></th><th colspan="2" class="c">ব্যয়</th></tr>
+    <tr><th>খাত</th><th class="r">টাকা</th><th class="gap"></th><th>খাত</th><th class="r">টাকা</th></tr></thead>
+    <tbody>${r}
+    <tr class="tt"><td class="r">সর্বমোট আয়</td><td class="r">${amt(ti)}</td>${SBS_GAP}<td class="r">সর্বমোট ব্যয়</td><td class="r">${amt(te)}</td></tr>
+    ${netRow(ti, te, 5)}</tbody></table>`;
+}
+function renderLedger() {
+  if (!$('lgOut')) return;
+  const s = rpSel('lg'), m = rpMeta('lg', s);
+  $('lgTitle').textContent = m.title; $('lgSub').textContent = m.sub;
+  $('lgOut').innerHTML = ledgerHtml(s);
+}
+function printRp(p) {
+  const s = rpSel(p), m = rpMeta(p, s);
+  const tbl = p === 'cr' ? cashHtml(s) : ledgerHtml(s);
+  printDoc(docHeader() + `<div class="dt u"><span>${m.title}</span></div>
+    <div class="meta"><span>সময়কাল: <b>${m.sub}</b></span><span>তারিখ: ${fdate(todayISO())}</span></div>
+    ${tbl}${sigBlock('ক্যাশিয়ার', 'সভাপতি')}${listFoot()}`);
 }
 
 /* =====================================================================
@@ -1014,6 +1164,6 @@ function hydrateIcons() {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeSide(); closePw(); closeShare(); } });
 document.addEventListener('DOMContentLoaded', () => {
   hydrateIcons(); buildMenu();
-  resetMemberForm(); resetCollForm(); resetSpecialForm(); resetExpForm(); initReport();
+  resetMemberForm(); resetCollForm(); resetSpecialForm(); resetExpForm(); initReport(); initRp('cr'); initRp('lg');
   loadData();
 });

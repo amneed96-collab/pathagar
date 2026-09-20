@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=8">
+<link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
 
@@ -198,7 +198,7 @@
 
   <!-- রিপোর্ট -->
   <section class="page" id="pg-report">
-    <div class="ptop"><h2>রিপোর্ট</h2>
+    <div class="ptop"><h2>শর্ট রিপোর্ট</h2>
       <button class="btn ghost" onclick="printReport()"><i data-ic="print"></i> প্রিন্ট</button>
     </div>
     <div class="card">
@@ -222,6 +222,32 @@
         </table>
       </div>
       <p class="hint" id="rNote"></p>
+    </div>
+  </section>
+
+  <!-- ক্যাশ রিপোর্ট -->
+  <section class="page" id="pg-cashReport">
+    <div class="ptop"><h2>ক্যাশ রিপোর্ট</h2>
+      <button class="btn ghost" onclick="printRp('cr')"><i data-ic="print"></i> প্রিন্ট</button>
+    </div>
+    <div class="card" id="crCtl"></div>
+    <div class="card">
+      <h3 id="crTitle"></h3>
+      <div class="rsub" id="crSub"></div>
+      <div class="tw" id="crOut"></div>
+    </div>
+  </section>
+
+  <!-- লেজার -->
+  <section class="page" id="pg-ledger">
+    <div class="ptop"><h2>লেজার</h2>
+      <button class="btn ghost" onclick="printRp('lg')"><i data-ic="print"></i> প্রিন্ট</button>
+    </div>
+    <div class="card" id="lgCtl"></div>
+    <div class="card">
+      <h3 id="lgTitle"></h3>
+      <div class="rsub" id="lgSub"></div>
+      <div class="tw" id="lgOut"></div>
     </div>
   </section>
 
@@ -388,6 +414,6 @@
 <div id="toast" class="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="app.js?v=8"></script>
+<script src="app.js?v=9"></script>
 </body>
 </html>
