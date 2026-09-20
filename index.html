@@ -50,7 +50,7 @@
       <h3 id="mTitle">নতুন সদস্য এন্ট্রি</h3>
       <input type="hidden" id="mId">
       <div class="fg">
-        <label>ক্রম (অটো)<input id="mSerial" readonly></label>
+        <label>সদস্য আইডি (অটো)<input id="mSerial" readonly></label>
         <label>তারিখ<input type="date" id="mDate"></label>
         <label>নাম<input id="mName" autocomplete="off"></label>
         <label>মোবাইল নং<input id="mMobile" type="tel" inputmode="tel"></label>
@@ -66,12 +66,12 @@
     <div class="card">
       <h3>সদস্য তালিকা</h3>
       <div class="tools">
-        <input id="mSearch" placeholder="নাম, মোবাইল বা ক্রম দিয়ে খুঁজুন" oninput="renderMembers()">
+        <input id="mSearch" placeholder="নাম, মোবাইল বা আইডি দিয়ে খুঁজুন" oninput="renderMembers()">
         <button class="btn ghost" onclick="printMembers()"><i data-ic="print"></i> প্রিন্ট</button>
       </div>
       <div class="tw">
         <table class="rt">
-          <thead><tr><th>ক্রম</th><th>তারিখ</th><th>নাম</th><th>মোবাইল</th><th>পেশা</th><th>ধার্য্য</th><th>ঠিকানা</th><th></th></tr></thead>
+          <thead><tr><th>সদস্য আইডি</th><th>তারিখ</th><th>নাম</th><th>মোবাইল</th><th>পেশা</th><th>ধার্য্য</th><th>ঠিকানা</th><th></th></tr></thead>
           <tbody id="mBody"></tbody>
         </table>
       </div>
@@ -90,7 +90,7 @@
         <label class="full">সদস্যের নাম
           <select id="cMember" onchange="onMemberPick()"></select>
         </label>
-        <label>ক্রম<input id="cSerial" readonly></label>
+        <label>সদস্য আইডি<input id="cSerial" readonly></label>
         <label>মোবাইল নং<input id="cMobile" readonly></label>
         <label class="full">ঠিকানা<input id="cAddr" readonly></label>
         <label>ধার্য্য (মাসিক)<input id="cFee" readonly></label>
@@ -106,13 +106,13 @@
     <div class="card">
       <h3>আদায়ের তালিকা</h3>
       <div class="tools">
-        <input id="cSearch" placeholder="নাম, রশিদ নং বা ক্রম দিয়ে খুঁজুন" oninput="renderColl()">
+        <input id="cSearch" placeholder="নাম, রশিদ নং বা আইডি দিয়ে খুঁজুন" oninput="renderColl()">
         <button class="btn ghost" onclick="printCollList()"><i data-ic="print"></i> প্রিন্ট</button>
         <button class="btn ghost" onclick="printDueList()"><i data-ic="bell"></i> বকেয়া তালিকা</button>
       </div>
       <div class="tw">
         <table class="rt">
-          <thead><tr><th>রশিদ নং</th><th>তারিখ</th><th>নাম</th><th>ক্রম</th><th>ধার্য্য</th><th>পূর্ব বকেয়া</th><th>পরিশোধ</th><th></th></tr></thead>
+          <thead><tr><th>রশিদ নং</th><th>তারিখ</th><th>নাম</th><th>সদস্য আইডি</th><th>ধার্য্য</th><th>পূর্ব বকেয়া</th><th>পরিশোধ</th><th></th></tr></thead>
           <tbody id="cBody"></tbody>
         </table>
       </div>
@@ -316,6 +316,7 @@
       <h3 id="nfTitleH">নতুন নোটিশ</h3>
       <input type="hidden" id="nfId">
       <div class="fg">
+        <label>নোটিশ নং (অটো)<input id="nfNo" readonly></label>
         <label>তারিখ<input type="date" id="nfDate"></label>
         <label>শিরোনাম<input id="nfTitle"></label>
         <label class="full">বিস্তারিত<textarea id="nfDetails" rows="8" class="just"></textarea></label>
@@ -330,7 +331,7 @@
       <h3>নোটিশ তালিকা</h3>
       <div class="tw">
         <table class="rt">
-          <thead><tr><th>তারিখ</th><th>শিরোনাম</th><th></th></tr></thead>
+          <thead><tr><th>নোটিশ নং</th><th>তারিখ</th><th>শিরোনাম</th><th></th></tr></thead>
           <tbody id="nfBody"></tbody>
         </table>
       </div>

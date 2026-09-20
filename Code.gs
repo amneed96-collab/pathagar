@@ -1,39 +1,59 @@
 /**
- * সংস্থা ব্যবস্থাপনা সিস্টেম — Google Apps Script API
+ * সংস্থা ব্যবস্থাপনা সিস্টেম — Google Apps Script API (সংস্করণ ২)
  *
  * ব্যবহারবিধি:
- * 1) একটি নতুন Google Sheet খুলুন → Extensions → Apps Script
+ * 1) একটি Google Sheet খুলুন → Extensions → Apps Script
  * 2) এই কোড পুরোটা বসান, Save করুন
- * 3) উপরের ড্রপডাউন থেকে setup ফাংশন সিলেক্ট করে একবার Run করুন (অনুমতি দিন)
- * 4) Deploy → New deployment → Web app
- *      Execute as: Me
- *      Who has access: Anyone
+ * 3) setup ফাংশন একবার Run করুন (অনুমতি দিন)
+ *      — আগের সংস্করণের ডেটা থাকলে setup নিজেই নতুন কাঠামোতে রূপান্তর করে দেবে
+ * 4) Deploy → Manage deployments → Edit → New version → Deploy
+ *      (প্রথমবার হলে: New deployment → Web app, Execute as: Me, Access: Anyone)
  * 5) Web app URL কপি করে app.js এর API_URL এ বসান
  *
  * ডিফল্ট ব্যবস্থাপনা পাসওয়ার্ড: admin123  (সেটাপ ফরম থেকে পরিবর্তন করুন)
- * কোড পরিবর্তন করলে প্রতিবার Deploy → Manage deployments → New version দিন।
+ *
+ * শীটে শুধু ফরমের ফিল্ডগুলোই কলাম হিসেবে থাকে; আলাদা id কলাম নেই।
+ * প্রতিটি শীটের প্রথম কলামই রেকর্ডের নম্বর/আইডি (সদস্য আইডি, রশিদ নং, ভাউচার নং, নোটিশ নং)।
  */
 
+var ID_PREFIX = 'ASP';          // সদস্য আইডির শুরু, যেমন ASP0001 (app.js এর ID_PREFIX এর সাথে মিল রাখুন)
 var DEFAULT_PASSWORD = 'admin123';
 
+// key = কোডে ব্যবহৃত নাম (ক্রম গুরুত্বপূর্ণ), label = শীটের হেডার
 var SHEETS = {
-  Members:     ['id', 'serial', 'date', 'name', 'mobile', 'occupation', 'fee', 'address'],
-  Collections: ['id', 'receiptNo', 'date', 'memberId', 'serial', 'name', 'mobile', 'address', 'fee', 'dueBefore', 'paid'],
-  Special:     ['id', 'receiptNo', 'date', 'name', 'mobile', 'address', 'description', 'amount'],
-  Expenses:    ['id', 'voucherNo', 'date', 'items', 'total', 'paid', 'due'],
-  Notices:     ['id', 'date', 'title', 'details'],
-  Settings:    ['key', 'value']
+  Members: {
+    keys:   ['memberId', 'date', 'name', 'mobile', 'occupation', 'fee', 'address'],
+    labels: ['সদস্য আইডি', 'তারিখ', 'নাম', 'মোবাইল নং', 'পেশা', 'ধার্য্য', 'ঠিকানা']
+  },
+  Collections: {
+    keys:   ['receiptNo', 'date', 'memberId', 'name', 'mobile', 'address', 'fee', 'dueBefore', 'paid'],
+    labels: ['রশিদ নং', 'তারিখ', 'সদস্য আইডি', 'নাম', 'মোবাইল নং', 'ঠিকানা', 'ধার্য্য', 'বকেয়া', 'পরিশোধ']
+  },
+  Special: {
+    keys:   ['receiptNo', 'date', 'name', 'mobile', 'address', 'description', 'amount'],
+    labels: ['রশিদ নং', 'তারিখ', 'নাম', 'মোবাইল নং', 'ঠিকানা', 'বিবরণ', 'টাকা']
+  },
+  Expenses: {
+    keys:   ['voucherNo', 'date', 'items', 'total', 'paid', 'due'],
+    labels: ['ভাউচার নং', 'তারিখ', 'খরচের তালিকা', 'সর্বমোট', 'পরিশোধ', 'বকেয়া']
+  },
+  Notices: {
+    keys:   ['noticeNo', 'date', 'title', 'details'],
+    labels: ['নোটিশ নং', 'তারিখ', 'শিরোনাম', 'বিস্তারিত']
+  },
+  Settings: {
+    keys:   ['key', 'value'],
+    labels: ['বিষয়', 'মান']
+  }
 };
 
-// অটো নম্বর ফিল্ড
-var AUTO = { Members: 'serial', Collections: 'receiptNo', Special: 'receiptNo', Expenses: 'voucherNo' };
-
-// পাসওয়ার্ড লাগবে এমন শিট
+// পাসওয়ার্ড লাগবে এমন শীট
 var LOCKED = { Notices: true };
 
 /* ---------- এন্ট্রি পয়েন্ট ---------- */
 
 function setup() {
+  migrateV1();
   Object.keys(SHEETS).forEach(function (n) { sheet_(n); });
   var def = ss_().getSheetByName('Sheet1');
   if (def && def.getLastRow() === 0 && ss_().getSheets().length > 1) ss_().deleteSheet(def);
@@ -90,7 +110,7 @@ function handle_(req) {
 
   if (a === 'save' || a === 'delete') {
     var name = req.sheet;
-    if (!SHEETS[name] || name === 'Settings') return { ok: false, error: 'অবৈধ শিট' };
+    if (!SHEETS[name] || name === 'Settings') return { ok: false, error: 'অবৈধ শীট' };
     if (LOCKED[name] && !checkPw_(req.pw)) return authErr_();
     return withLock_(function () {
       return a === 'save' ? saveRecord_(name, req.record || {}) : deleteRecord_(name, req.id);
@@ -108,22 +128,28 @@ function withLock_(fn) {
   try { return fn(); } finally { lock.releaseLock(); }
 }
 
-/* ---------- শিট সহায়ক ---------- */
+/* ---------- শীট সহায়ক ---------- */
 
 function ss_() { return SpreadsheetApp.getActiveSpreadsheet(); }
+
+function formatSheet_(sh, name) {
+  var def = SHEETS[name], n = def.keys.length;
+  if (sh.getMaxColumns() > n) sh.deleteColumns(n + 1, sh.getMaxColumns() - n); // অতিরিক্ত ফাঁকা কলাম বাদ
+  sh.getRange(1, 1, sh.getMaxRows(), n).setNumberFormat('@');                   // সব ঘর টেক্সট
+  sh.getRange(1, 1, 1, n).setValues([def.labels])
+    .setFontWeight('bold').setBackground('#0f3a7d').setFontColor('#ffffff');
+  sh.setFrozenRows(1);
+}
 
 function sheet_(name) {
   var ss = ss_();
   var sh = ss.getSheetByName(name);
   if (!sh) {
     sh = ss.insertSheet(name);
-    var h = SHEETS[name];
-    // সব ঘর টেক্সট ফরম্যাটে (মোবাইলের শুরুর ০ ও তারিখ ঠিক থাকবে)
-    sh.getRange(1, 1, sh.getMaxRows(), h.length).setNumberFormat('@');
-    sh.getRange(1, 1, 1, h.length).setValues([h])
-      .setFontWeight('bold').setBackground('#0f3a7d').setFontColor('#ffffff');
-    sh.setFrozenRows(1);
+    formatSheet_(sh, name);
     if (name === 'Settings') sh.getRange(2, 1, 1, 2).setValues([['password', DEFAULT_PASSWORD]]);
+  } else if (String(sh.getRange(1, 1).getValue()) === 'id') {
+    throw new Error('শীটের কাঠামো পুরনো। Apps Script এ setup ফাংশন একবার Run করুন।');
   }
   return sh;
 }
@@ -134,13 +160,13 @@ function str_(v) {
 }
 
 function readAll_(name) {
-  var sh = sheet_(name), h = SHEETS[name];
+  var sh = sheet_(name), keys = SHEETS[name].keys;
   var n = sh.getLastRow() - 1;
   if (n < 1) return [];
-  var vals = sh.getRange(2, 1, n, h.length).getValues();
+  var vals = sh.getRange(2, 1, n, keys.length).getValues();
   return vals.map(function (r) {
     var o = {};
-    h.forEach(function (k, i) { o[k] = str_(r[i]); });
+    keys.forEach(function (k, i) { o[k] = str_(r[i]); });
     return o;
   });
 }
@@ -190,44 +216,50 @@ function setSetting_(key, val) {
 
 /* ---------- রেকর্ড সংরক্ষণ / মুছে ফেলা ---------- */
 
+function memberId_(n) {
+  var s = String(n);
+  while (s.length < 4) s = '0' + s;
+  return ID_PREFIX + s;
+}
+
+// প্রথম কলামের সংখ্যাংশের সর্বোচ্চ মান + ১
+function nextNo_(data) {
+  var max = 0;
+  data.forEach(function (r) {
+    var v = parseInt(String(r[0]).replace(/\D/g, ''), 10);
+    if (!isNaN(v) && v > max) max = v;
+  });
+  return max + 1;
+}
+
+// req.record.id = বিদ্যমান রেকর্ডের নম্বর/আইডি (নতুন হলে ফাঁকা)। এটি শীটে কলাম হিসেবে যায় না।
 function saveRecord_(name, rec) {
-  var sh = sheet_(name), h = SHEETS[name];
+  var sh = sheet_(name), keys = SHEETS[name].keys;
   var n = sh.getLastRow() - 1;
-  var data = n > 0 ? sh.getRange(2, 1, n, h.length).getValues() : [];
+  var data = n > 0 ? sh.getRange(2, 1, n, keys.length).getValues() : [];
   var row = -1;
+  var existing = rec.id ? String(rec.id) : '';
 
-  if (rec.id) {
+  if (existing) {
     for (var i = 0; i < data.length; i++) {
-      if (String(data[i][0]) === String(rec.id)) { row = i + 2; break; }
+      if (String(data[i][0]) === existing) { row = i + 2; break; }
     }
-  }
-
-  var auto = AUTO[name];
-  if (row < 0) {
-    rec.id = Utilities.getUuid();
-    if (auto) rec[auto] = String(nextNo_(data, h.indexOf(auto)));
+    if (row < 0) return { ok: false, error: 'রেকর্ডটি পাওয়া যায়নি' };
+    rec[keys[0]] = existing;                 // নম্বর/আইডি অপরিবর্তিত
+  } else {
+    var no = nextNo_(data);
+    rec[keys[0]] = name === 'Members' ? memberId_(no) : String(no);
     row = sh.getLastRow() + 1;
-  } else if (auto) {
-    rec[auto] = String(data[row - 2][h.indexOf(auto)]); // এডিটে অটো নম্বর অপরিবর্তিত
   }
 
-  var vals = h.map(function (k) { return rec[k] == null ? '' : String(rec[k]); });
-  var rg = sh.getRange(row, 1, 1, h.length);
+  var vals = keys.map(function (k) { return rec[k] == null ? '' : String(rec[k]); });
+  var rg = sh.getRange(row, 1, 1, keys.length);
   rg.setNumberFormat('@');
   rg.setValues([vals]);
 
   var out = {};
-  h.forEach(function (k, i) { out[k] = vals[i]; });
+  keys.forEach(function (k, i) { out[k] = vals[i]; });
   return { ok: true, record: out };
-}
-
-function nextNo_(data, col) {
-  var max = 0;
-  data.forEach(function (r) {
-    var v = parseInt(r[col], 10);
-    if (!isNaN(v) && v > max) max = v;
-  });
-  return max + 1;
 }
 
 function deleteRecord_(name, id) {
@@ -242,4 +274,48 @@ function deleteRecord_(name, id) {
     }
   }
   return { ok: false, error: 'রেকর্ড পাওয়া যায়নি' };
+}
+
+/* ---------- আগের সংস্করণ (id কলামসহ) থেকে রূপান্তর ---------- */
+
+function migrateV1() {
+  var ss = ss_();
+
+  function oldRows(name) {
+    var sh = ss.getSheetByName(name);
+    if (!sh || sh.getLastRow() < 1 || String(sh.getRange(1, 1).getValue()) !== 'id') return null;
+    var n = sh.getLastRow() - 1;
+    return n > 0 ? sh.getRange(2, 1, n, sh.getLastColumn()).getValues() : [];
+  }
+
+  var oM = oldRows('Members'), oC = oldRows('Collections'), oS = oldRows('Special'),
+      oE = oldRows('Expenses'), oN = oldRows('Notices');
+  if (!oM && !oC && !oS && !oE && !oN) return;
+
+  var idMap = {};
+  var nM = oM && oM.map(function (r, i) {
+    var mid = memberId_(parseInt(r[1], 10) || (i + 1));
+    idMap[String(r[0])] = mid;
+    return [mid, r[2], r[3], r[4], r[5], r[6], r[7]];
+  });
+  var nC = oC && oC.map(function (r) {
+    var mid = idMap[String(r[3])] || memberId_(parseInt(r[4], 10) || 0);
+    return [r[1], r[2], mid, r[5], r[6], r[7], r[8], r[9], r[10]];
+  });
+  var nS = oS && oS.map(function (r) { return r.slice(1, 8); });
+  var nE = oE && oE.map(function (r) { return r.slice(1, 7); });
+  var nN = oN && oN.map(function (r, i) { return [String(i + 1), r[1], r[2], r[3]]; });
+
+  [['Members', nM], ['Collections', nC], ['Special', nS], ['Expenses', nE], ['Notices', nN]].forEach(function (p) {
+    if (!p[1]) return;
+    var name = p[0], rows = p[1], sh = ss.getSheetByName(name), w = SHEETS[name].keys.length;
+    sh.clear();
+    formatSheet_(sh, name);
+    if (rows.length) {
+      if (sh.getMaxRows() < rows.length + 1) sh.insertRowsAfter(sh.getMaxRows(), rows.length + 1 - sh.getMaxRows());
+      var rg = sh.getRange(2, 1, rows.length, w);
+      rg.setNumberFormat('@');
+      rg.setValues(rows.map(function (r) { return r.slice(0, w).map(str_); }));
+    }
+  });
 }
