@@ -770,6 +770,7 @@ function printExpList() {
 /* =====================================================================
    রিপোর্ট (মাসিক / বাৎসরিক / সর্বমোট)
    ===================================================================== */
+const REPORT_NOTE = 'মোট ধার্য্য = প্রত্যেক সদস্যের মাসিক ধার্য্য × সদস্য হওয়ার মাস থেকে চলতি মাস পর্যন্ত মোট মাস (দুই মাসই ধরে)। বকেয়া = মোট ধার্য্য − সদস্যের মোট পরিশোধ।';
 const MONTHS = ['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
 let repType = 'month';
 const monthIdx = iso => { const p = String(iso || '').split('-').map(Number); return (p[0] && p[1]) ? p[0] * 12 + p[1] - 1 : null; };
@@ -807,8 +808,9 @@ function reportCalc(type, y, m) {
   let assessed = 0, due = 0;
   S.members.forEach(mm => {
     const js = monthIdx(mm.date); if (js === null) return;
-    const a = Math.max(0, Math.min(pe, now) - Math.max(ps, js) + 1) * num(mm.fee);
-    const p = S.collections.filter(c => c.memberId === mm.id && inR(c.date)).reduce((s, c) => s + num(c.paid), 0);
+    // ধার্য্য ও বকেয়া সবসময় আজ পর্যন্ত: মাসিক ধার্য্য × (সদস্য হওয়ার মাস থেকে চলতি মাস পর্যন্ত মাস)
+    const a = Math.max(0, now - js + 1) * num(mm.fee);
+    const p = S.collections.filter(c => c.memberId === mm.id).reduce((s, c) => s + num(c.paid), 0);
     assessed += a; due += Math.max(0, a - p);
   });
   const coll = sum(S.collections.filter(c => inR(c.date)), 'paid');
@@ -827,7 +829,8 @@ function reportView() {
     year: { t: 'বাৎসরিক রিপোর্ট', s: bn(y) + ' সাল' },
     all: { t: 'সর্বমোট রিপোর্ট', s: 'শুরু থেকে ' + fdate(todayISO()) + ' পর্যন্ত' }
   }[repType];
-  const rows = [['মোট ধার্য্য', r.assessed, ''], ['মোট আদায়', r.coll, ''], ['বিশেষ কালেকশন', r.spec, ''], ['মোট বকেয়া', r.due, ''], ['মোট খরচ', r.exp, ''], [r.net >= 0 ? 'উদ্বৃত্ত' : 'ঘাটতি', Math.abs(r.net), r.net >= 0 ? 'pos' : 'neg']];
+  const upto = periodic ? ' (আজ পর্যন্ত)' : '';
+  const rows = [['মোট ধার্য্য' + upto, r.assessed, ''], ['মোট আদায়', r.coll, ''], ['বিশেষ কালেকশন', r.spec, ''], ['মোট বকেয়া' + upto, r.due, ''], ['মোট খরচ', r.exp, ''], [r.net >= 0 ? 'উদ্বৃত্ত' : 'ঘাটতি', Math.abs(r.net), r.net >= 0 ? 'pos' : 'neg']];
   if (periodic) rows.push(['পূর্বের জের (ক্যাশ)', r.open, r.open < 0 ? 'neg' : '']);
   rows.push([periodic ? 'মেয়াদ শেষে ক্যাশ' : 'বর্তমান ক্যাশ', r.cash, 'hi' + (r.cash < 0 ? ' neg' : '')]);
   return { meta, rows };
@@ -837,6 +840,7 @@ function renderReport() {
   const v = reportView();
   $('rTitle').textContent = v.meta.t;
   $('rSub').textContent = v.meta.s;
+  $('rNote').textContent = REPORT_NOTE;
   $('rBody').innerHTML = v.rows.map(r => `<tr class="${r[2]}"><td data-l="বিবরণ">${r[0]}</td><td data-l="টাকা">${taka(r[1])}</td></tr>`).join('');
 }
 function printReport() {
@@ -845,7 +849,7 @@ function printReport() {
     <div class="meta"><span>সময়কাল: <b>${v.meta.s}</b></span><span>তারিখ: ${fdate(todayISO())}</span></div>
     <table><thead><tr><th style="width:60px">ক্রম</th><th>বিবরণ</th><th class="r" style="width:160px">টাকা</th></tr></thead><tbody>
     ${v.rows.map((r, i) => `<tr><td>${bn(i + 1)}</td><td>${r[0]}</td><td class="r"><b>${taka(r[1])}</b></td></tr>`).join('')}
-    </tbody></table>${sigBlock('ক্যাশিয়ার', 'সভাপতি')}${listFoot()}`);
+    </tbody></table><div class="foot" style="text-align:left">${REPORT_NOTE}</div>${sigBlock('ক্যাশিয়ার', 'সভাপতি')}${listFoot()}`);
 }
 
 /* =====================================================================
