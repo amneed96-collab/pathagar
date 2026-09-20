@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=9">
+<link rel="stylesheet" href="style.css?v=10">
 </head>
 <body>
 
@@ -45,8 +45,8 @@
 
   <!-- সদস্য এন্ট্রি -->
   <section class="page" id="pg-memberEntry">
-    <div class="ptop"><h2>সদস্য এন্ট্রি</h2></div>
-    <div class="card">
+    <div class="ptop"><button class="btn tg" id="mTog" aria-expanded="false" onclick="toggleForm('m')"><i data-ic="plus"></i> সদস্য এন্ট্রি</button></div>
+    <div class="card fc" id="mFormCard">
       <h3 id="mTitle">নতুন সদস্য এন্ট্রি</h3>
       <input type="hidden" id="mId">
       <div class="fg">
@@ -80,8 +80,8 @@
 
   <!-- সদস্য চাঁদা আদায় -->
   <section class="page" id="pg-collection">
-    <div class="ptop"><h2>সদস্য চাঁদা আদায়</h2></div>
-    <div class="card">
+    <div class="ptop"><button class="btn tg" id="cTog" aria-expanded="false" onclick="toggleForm('c')"><i data-ic="plus"></i> সদস্য চাঁদা আদায়</button></div>
+    <div class="card fc" id="cFormCard">
       <h3 id="cTitle">নতুন চাঁদা আদায়</h3>
       <input type="hidden" id="cId">
       <div class="fg">
@@ -121,8 +121,8 @@
 
   <!-- বিশেষ কালেকশন -->
   <section class="page" id="pg-special">
-    <div class="ptop"><h2>বিশেষ কালেকশন</h2></div>
-    <div class="card">
+    <div class="ptop"><button class="btn tg" id="sTog" aria-expanded="false" onclick="toggleForm('s')"><i data-ic="plus"></i> বিশেষ কালেকশন</button></div>
+    <div class="card fc" id="sFormCard">
       <h3 id="sTitle">বিশেষ কালেকশন ফরম</h3>
       <input type="hidden" id="sId">
       <div class="fg">
@@ -156,8 +156,8 @@
 
   <!-- খরচ -->
   <section class="page" id="pg-expense">
-    <div class="ptop"><h2>খরচ</h2></div>
-    <div class="card">
+    <div class="ptop"><button class="btn tg" id="eTog" aria-expanded="false" onclick="toggleForm('e')"><i data-ic="plus"></i> খরচ</button></div>
+    <div class="card fc" id="eFormCard">
       <h3 id="eTitle">নতুন খরচ ভাউচার</h3>
       <input type="hidden" id="eId">
       <div class="fg">
@@ -212,7 +212,7 @@
         <label id="rYearWrap">বছর<select id="rYear" onchange="renderReport()"></select></label>
       </div>
     </div>
-    <div class="card">
+    <div class="card bw">
       <h3 id="rTitle">রিপোর্ট</h3>
       <div class="rsub" id="rSub"></div>
       <div class="tw">
@@ -231,7 +231,7 @@
       <button class="btn ghost" onclick="printRp('cr')"><i data-ic="print"></i> প্রিন্ট</button>
     </div>
     <div class="card" id="crCtl"></div>
-    <div class="card">
+    <div class="card bw">
       <h3 id="crTitle"></h3>
       <div class="rsub" id="crSub"></div>
       <div class="tw" id="crOut"></div>
@@ -244,7 +244,7 @@
       <button class="btn ghost" onclick="printRp('lg')"><i data-ic="print"></i> প্রিন্ট</button>
     </div>
     <div class="card" id="lgCtl"></div>
-    <div class="card">
+    <div class="card bw">
       <h3 id="lgTitle"></h3>
       <div class="rsub" id="lgSub"></div>
       <div class="tw" id="lgOut"></div>
@@ -414,6 +414,6 @@
 <div id="toast" class="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="app.js?v=9"></script>
+<script src="app.js?v=10"></script>
 </body>
 </html>

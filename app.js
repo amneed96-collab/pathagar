@@ -268,8 +268,8 @@ function docHeader(sm) {
     <div class="tx"><h1>${esc(s.name || 'সংস্থার নাম')}</h1>${line1 ? `<p>${line1}</p>` : ''}${s.address ? `<p>${esc(s.address)}</p>` : ''}${line3 ? `<p>${line3}</p>` : ''}</div>
     ${s.logo ? '<div style="width:64px"></div>' : ''}</div>`;
 }
-function printDoc(html) {
-  $('printArea').innerHTML = html;
+function printDoc(html, bw) {
+  $('printArea').innerHTML = bw ? '<div class="bw">' + html + '</div>' : html;
   setTimeout(() => window.print(), 150);
 }
 const listFoot = () => `<div class="foot">প্রিন্টের তারিখ: ${fdate(todayISO())}</div>`;
@@ -329,7 +329,7 @@ function resetMemberForm() {
   $('mDate').value = todayISO();
   ['mName', 'mMobile', 'mJob', 'mFee', 'mAddr'].forEach(i => $(i).value = '');
   $('mTitle').textContent = 'নতুন সদস্য এন্ট্রি';
-  $('mCancel').style.display = 'none';
+  $('mCancel').style.display = 'none'; closeForm('m');
 }
 async function saveMember() {
   const rec = {
@@ -349,7 +349,7 @@ function editMember(id) {
   $('mName').value = m.name; $('mMobile').value = m.mobile; $('mJob').value = m.occupation;
   $('mFee').value = m.fee; $('mAddr').value = m.address;
   $('mTitle').textContent = 'সদস্য তথ্য সংশোধন';
-  $('mCancel').style.display = '';
+  $('mCancel').style.display = ''; openForm('m');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 async function delMember(id) {
@@ -395,7 +395,7 @@ function resetCollForm() {
   fillMemberSelect(); $('cMember').value = '';
   ['cSerial', 'cMobile', 'cAddr', 'cFee', 'cDue', 'cPaid', 'cRemain'].forEach(i => $(i).value = '');
   $('cTitle').textContent = 'নতুন চাঁদা আদায়';
-  $('cCancel').style.display = 'none';
+  $('cCancel').style.display = 'none'; closeForm('c');
 }
 function onMemberPick() {
   const m = findMember($('cMember').value);
@@ -437,7 +437,7 @@ function editColl(id) {
   onMemberPick();
   $('cPaid').value = num(c.paid); updateRemain();
   $('cTitle').textContent = 'চাঁদা আদায় সংশোধন';
-  $('cCancel').style.display = '';
+  $('cCancel').style.display = ''; openForm('c');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 async function delColl(id) {
@@ -510,7 +510,7 @@ function resetSpecialForm() {
   $('sDate').value = todayISO();
   ['sName', 'sMobile', 'sAddr', 'sDesc', 'sAmt'].forEach(i => $(i).value = '');
   $('sTitle').textContent = 'বিশেষ কালেকশন ফরম';
-  $('sCancel').style.display = 'none';
+  $('sCancel').style.display = 'none'; closeForm('s');
 }
 async function saveSpecial() {
   const rec = {
@@ -530,7 +530,7 @@ function editSpecial(id) {
   $('sName').value = x.name; $('sMobile').value = x.mobile; $('sAddr').value = x.address;
   $('sDesc').value = x.description; $('sAmt').value = num(x.amount);
   $('sTitle').textContent = 'বিশেষ কালেকশন সংশোধন';
-  $('sCancel').style.display = '';
+  $('sCancel').style.display = ''; openForm('s');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 async function delSpecial(id) {
@@ -702,7 +702,7 @@ function resetExpForm() {
   $('ePaid').value = '';
   dynLoad('exp', []);
   $('eTitle').textContent = 'নতুন খরচ ভাউচার';
-  $('eCancel').style.display = 'none';
+  $('eCancel').style.display = 'none'; closeForm('e');
 }
 function calcExp() {
   const total = DYN.exp.rows.reduce((s, r) => s + num(r.amt), 0);
@@ -726,7 +726,7 @@ function editExp(id) {
   dynLoad('exp', parseJ(x.items, []).map(i => ({ desc: i.d, amt: String(i.a) })));
   $('ePaid').value = num(x.paid); calcExp();
   $('eTitle').textContent = 'খরচ ভাউচার সংশোধন';
-  $('eCancel').style.display = '';
+  $('eCancel').style.display = ''; openForm('e');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 async function delExp(id) {
@@ -849,7 +849,7 @@ function printReport() {
     <div class="meta"><span>সময়কাল: <b>${v.meta.s}</b></span><span>তারিখ: ${fdate(todayISO())}</span></div>
     <table><thead><tr><th style="width:60px">ক্রম</th><th>বিবরণ</th><th class="r" style="width:160px">টাকা</th></tr></thead><tbody>
     ${v.rows.map((r, i) => `<tr><td>${bn(i + 1)}</td><td>${r[0]}</td><td class="r"><b>${taka(r[1])}</b></td></tr>`).join('')}
-    </tbody></table><div class="foot" style="text-align:left">${REPORT_NOTE}</div>${sigBlock('ক্যাশিয়ার', 'সভাপতি')}${listFoot()}`);
+    </tbody></table><div class="foot" style="text-align:left">${REPORT_NOTE}</div>${sigBlock('ক্যাশিয়ার', 'সভাপতি')}${listFoot()}`, true);
 }
 
 /* =====================================================================
@@ -922,7 +922,7 @@ function inPeriod(e, s) {
 
 const SBS_GAP = '<td class="gap"></td>';
 function netRow(ti, te, cols) {
-  return `<tr class="tt"><td colspan="${cols}" class="r">${ti >= te ? 'উদ্বৃত্ত' : 'ঘাটতি'} (আয় − ব্যয়): ${taka(Math.abs(ti - te))}</td></tr>`;
+  return `<tr class="net"><td colspan="${cols}" class="r">${ti >= te ? 'উদ্বৃত্ত' : 'ঘাটতি'} (আয় − ব্যয়): ${taka(Math.abs(ti - te))}</td></tr>`;
 }
 function cashHtml(s) {
   const e = rpEntries(), inc = e.inc.filter(x => inPeriod(x, s)), exp = e.exp.filter(x => inPeriod(x, s));
@@ -934,7 +934,7 @@ function cashHtml(s) {
     r += `<tr><td>${a ? a.no : ''}</td><td>${a ? esc(a.desc) : ''}</td><td class="r">${a ? amt(a.amt) : ''}</td>${SBS_GAP}<td>${b ? b.no : ''}</td><td>${b ? esc(b.desc) : ''}</td><td class="r">${b ? amt(b.amt) : ''}</td></tr>`;
   }
   const ti = sum(inc, 'amt'), te = sum(exp, 'amt');
-  return `<table class="sbs"><thead>
+  return `<table class="sbs"><colgroup><col style="width:9%"><col style="width:29%"><col style="width:11%"><col style="width:2%"><col style="width:9%"><col style="width:29%"><col style="width:11%"></colgroup><thead>
     <tr><th colspan="3" class="c">আয়</th><th class="gap"></th><th colspan="3" class="c">ব্যয়</th></tr>
     <tr><th>রশিদ নং</th><th>বিবরণ</th><th class="r">টাকা</th><th class="gap"></th><th>ভাউচার নং</th><th>বিবরণ</th><th class="r">টাকা</th></tr></thead>
     <tbody>${r}
@@ -979,7 +979,7 @@ function ledgerHtml(s) {
     const gi = tot(g.inc), ge = tot(g.exp); ti += gi; te += ge;
     if (g.label) r += `<tr class="sub"><td class="r">মোট আয়</td><td class="r">${amt(gi)}</td>${SBS_GAP}<td class="r">মোট ব্যয়</td><td class="r">${amt(ge)}</td></tr>`;
   });
-  return `<table class="sbs"><thead>
+  return `<table class="sbs"><colgroup><col style="width:34%"><col style="width:15%"><col style="width:2%"><col style="width:34%"><col style="width:15%"></colgroup><thead>
     <tr><th colspan="2" class="c">আয়</th><th class="gap"></th><th colspan="2" class="c">ব্যয়</th></tr>
     <tr><th>খাত</th><th class="r">টাকা</th><th class="gap"></th><th>খাত</th><th class="r">টাকা</th></tr></thead>
     <tbody>${r}
@@ -997,7 +997,7 @@ function printRp(p) {
   const tbl = p === 'cr' ? cashHtml(s) : ledgerHtml(s);
   printDoc(docHeader() + `<div class="dt u"><span>${m.title}</span></div>
     <div class="meta"><span>সময়কাল: <b>${m.sub}</b></span><span>তারিখ: ${fdate(todayISO())}</span></div>
-    ${tbl}${sigBlock('ক্যাশিয়ার', 'সভাপতি')}${listFoot()}`);
+    ${tbl}${sigBlock('ক্যাশিয়ার', 'সভাপতি')}${listFoot()}`, true);
 }
 
 /* =====================================================================
@@ -1155,6 +1155,14 @@ function renderNoticeAdmin() {
     <td data-l="নোটিশ নং">${bn(n.noticeNo)}</td><td data-l="তারিখ">${fdate(n.date)}</td><td data-l="শিরোনাম"><b>${esc(n.title)}</b></td>
     <td class="act"><button class="ib" title="এডিট" onclick="editNotice('${n.id}')">${icon('edit', 17)}</button><button class="ib del" title="ডিলেট" onclick="delNotice('${n.id}')">${icon('trash', 17)}</button></td></tr>`).join('')
     : '<tr><td colspan="4" class="empty">কোনো নোটিশ নেই</td></tr>';
+}
+
+/* ---------- ফরম খোলা/বন্ধ (বাটন) ---------- */
+function openForm(p) { $(p + 'FormCard').classList.add('open'); $(p + 'Tog').setAttribute('aria-expanded', 'true'); }
+function closeForm(p) { const c = $(p + 'FormCard'); if (!c) return; c.classList.remove('open'); $(p + 'Tog').setAttribute('aria-expanded', 'false'); }
+function toggleForm(p) {
+  if ($(p + 'FormCard').classList.contains('open')) ({ m: resetMemberForm, c: resetCollForm, s: resetSpecialForm, e: resetExpForm })[p]();
+  else openForm(p);
 }
 
 /* ---------- শুরু ---------- */
