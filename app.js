@@ -808,7 +808,7 @@ function reportCalc(type, y, m) {
     const js = monthIdx(mm.date); if (js === null) return;
     // মাসিক ধার্য্য × (সদস্য হওয়ার মাস থেকে নির্বাচিত সময় বা আজ পর্যন্ত মাস)
     const a = Math.max(0, Math.min(pe, now) - js + 1) * num(mm.fee);
-    const p = S.collections.filter(c => c.memberId === mm.id && upto(c.date)).reduce((s, c) => s + num(c.paid), 0);
+    const p = S.collections.filter(c => c.memberId === mm.memberId && upto(c.date)).reduce((s, c) => s + num(c.paid), 0);
     assessed += a; due += Math.max(0, a - p);
   });
   const coll = sum(S.collections.filter(c => upto(c.date)), 'paid');
