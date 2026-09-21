@@ -34,8 +34,8 @@ var SHEETS = {
     labels: ['রশিদ নং', 'তারিখ', 'নাম', 'মোবাইল নং', 'ঠিকানা', 'বিবরণ', 'টাকা']
   },
   Expenses: {
-    keys:   ['voucherNo', 'date', 'items', 'total'],
-    labels: ['ভাউচার নং', 'তারিখ', 'খরচের তালিকা', 'সর্বমোট']
+    keys:   ['voucherNo', 'date', 'description', 'amount'],   // প্রতিটি খরচের আইটেম আলাদা সারিতে
+    labels: ['ভাউচার নং', 'তারিখ', 'বিবরণ', 'টাকা']
   },
   Notices: {
     keys:   ['noticeNo', 'date', 'title', 'details'],
@@ -54,7 +54,7 @@ var LOCKED = { Notices: true };
 
 function setup() {
   migrateV1();
-  migrateV2();
+  migrateV3();
   Object.keys(SHEETS).forEach(function (n) { sheet_(n); });
   var def = ss_().getSheetByName('Sheet1');
   if (def && def.getLastRow() === 0 && ss_().getSheets().length > 1) ss_().deleteSheet(def);
@@ -114,6 +114,7 @@ function handle_(req) {
     if (!SHEETS[name] || name === 'Settings') return { ok: false, error: 'অবৈধ শীট' };
     if (LOCKED[name] && !checkPw_(req.pw)) return authErr_();
     return withLock_(function () {
+      if (name === 'Expenses') return a === 'save' ? saveExpense_(req.record || {}) : deleteExpense_(req.id);
       return a === 'save' ? saveRecord_(name, req.record || {}) : deleteRecord_(name, req.id);
     });
   }
@@ -183,7 +184,7 @@ function getAll_() {
     members: readAll_('Members'),
     collections: readAll_('Collections'),
     special: readAll_('Special'),
-    expenses: readAll_('Expenses'),
+    expenses: groupExpenses_(readAll_('Expenses')),
     notices: readAll_('Notices')
   };
 }
@@ -210,6 +211,7 @@ function setSetting_(key, val) {
     for (var i = 0; i < keys.length; i++) if (String(keys[i][0]) === key) { row = i + 2; break; }
   }
   if (row < 0) row = sh.getLastRow() + 1;
+  ensureRows_(sh, row);
   var rg = sh.getRange(row, 1, 1, 2);
   rg.setNumberFormat('@');
   rg.setValues([[key, val == null ? '' : String(val)]]);
@@ -254,6 +256,7 @@ function saveRecord_(name, rec) {
   }
 
   var vals = keys.map(function (k) { return rec[k] == null ? '' : String(rec[k]); });
+  ensureRows_(sh, row);
   var rg = sh.getRange(row, 1, 1, keys.length);
   rg.setNumberFormat('@');
   rg.setValues([vals]);
@@ -304,7 +307,7 @@ function migrateV1() {
     return [r[1], r[2], mid, r[5], r[6], r[7], r[8], r[9], r[10]];
   });
   var nS = oS && oS.map(function (r) { return r.slice(1, 8); });
-  var nE = oE && oE.map(function (r) { return r.slice(1, 5); });
+  var nE = oE && oE.reduce(function (acc, r) { return acc.concat(expandExpense_(r[1], r[2], r[3])); }, []);
   var nN = oN && oN.map(function (r, i) { return [String(i + 1), r[1], r[2], r[3]]; });
 
   [['Members', nM], ['Collections', nC], ['Special', nS], ['Expenses', nE], ['Notices', nN]].forEach(function (p) {
@@ -321,10 +324,97 @@ function migrateV1() {
   });
 }
 
-/* ---------- খরচ শীট থেকে "পরিশোধ" ও "বকেয়া" কলাম বাদ ---------- */
+/* ---------- খরচ: প্রতি আইটেম আলাদা সারি (ভাউচার নং, তারিখ, বিবরণ, টাকা) ---------- */
 
-function migrateV2() {
+function ensureRows_(sh, lastRowNeeded) {
+  var max = sh.getMaxRows();
+  if (max < lastRowNeeded) sh.insertRowsAfter(max, lastRowNeeded - max);
+}
+
+function expandExpense_(vno, date, itemsJson) {
+  var items = [];
+  try { items = JSON.parse(itemsJson) || []; } catch (e) { items = []; }
+  return items.map(function (it) { return [str_(vno), str_(date), String(it.d || ''), String(Number(it.a) || 0)]; });
+}
+
+// শীটের সারিগুলোকে ভাউচার অনুযায়ী জোড়া লাগিয়ে অ্যাপে পাঠানো (সর্বমোট এখানেই হিসাব হয়)
+function groupExpenses_(rows) {
+  var order = [], map = {};
+  rows.forEach(function (r) {
+    var k = r.voucherNo;
+    if (!k) return;
+    if (!map[k]) { map[k] = { voucherNo: k, date: r.date, items: [], total: 0 }; order.push(k); }
+    var a = parseFloat(r.amount) || 0;
+    map[k].items.push({ d: r.description, a: a });
+    map[k].total += a;
+  });
+  return order.map(function (k) {
+    var v = map[k];
+    return { voucherNo: v.voucherNo, date: v.date, items: JSON.stringify(v.items), total: String(v.total) };
+  });
+}
+
+// rec.id = বিদ্যমান ভাউচার নং (নতুন হলে ফাঁকা); rec.items = JSON [{d, a}]
+function saveExpense_(rec) {
+  var sh = sheet_('Expenses'), w = SHEETS.Expenses.keys.length;
+  var n = sh.getLastRow() - 1;
+  var data = n > 0 ? sh.getRange(2, 1, n, w).getValues() : [];
+  var items;
+  try { items = JSON.parse(rec.items || '[]'); } catch (e) { items = []; }
+  if (!items.length) return { ok: false, error: 'কমপক্ষে একটি খরচের বিবরণ দিন' };
+
+  var existing = rec.id ? String(rec.id) : '';
+  var vno, pos = -1;
+  if (existing) {
+    for (var i = data.length - 1; i >= 0; i--) {
+      if (String(data[i][0]) === existing) { sh.deleteRow(i + 2); pos = i + 2; }   // পুরনো সারি বাদ; pos = প্রথম সারির অবস্থান
+    }
+    if (pos < 0) return { ok: false, error: 'রেকর্ডটি পাওয়া যায়নি' };
+    vno = existing;
+  } else {
+    vno = String(nextNo_(data));
+  }
+
+  var rows = items.map(function (it) { return [vno, String(rec.date || ''), String(it.d || ''), String(Number(it.a) || 0)]; });
+  var start;
+  if (pos > 0 && pos <= sh.getLastRow()) { sh.insertRowsBefore(pos, rows.length); start = pos; }   // আগের জায়গাতেই বসবে
+  else { start = sh.getLastRow() + 1; ensureRows_(sh, start + rows.length - 1); }
+  var rg = sh.getRange(start, 1, rows.length, w);
+  rg.setNumberFormat('@');
+  rg.setValues(rows);
+
+  var total = rows.reduce(function (s, r) { return s + Number(r[3]); }, 0);
+  var clean = items.map(function (it) { return { d: String(it.d || ''), a: Number(it.a) || 0 }; });
+  return { ok: true, record: { voucherNo: vno, date: String(rec.date || ''), items: JSON.stringify(clean), total: String(total) } };
+}
+
+function deleteExpense_(id) {
+  var sh = sheet_('Expenses');
+  var n = sh.getLastRow() - 1;
+  if (n < 1) return { ok: false, error: 'রেকর্ড পাওয়া যায়নি' };
+  var ids = sh.getRange(2, 1, n, 1).getValues();
+  var found = false;
+  for (var i = ids.length - 1; i >= 0; i--) {
+    if (String(ids[i][0]) === String(id)) { sh.deleteRow(i + 2); found = true; }
+  }
+  return found ? { ok: true } : { ok: false, error: 'রেকর্ড পাওয়া যায়নি' };
+}
+
+// আগের কাঠামো (একটি কলামে JSON তালিকা) থেকে প্রতি আইটেম আলাদা সারিতে রূপান্তর
+function migrateV3() {
   var sh = ss_().getSheetByName('Expenses');
-  if (!sh || sh.getLastColumn() <= 4) return;
-  sh.deleteColumns(5, sh.getLastColumn() - 4);
+  if (!sh || sh.getLastRow() < 1 || sh.getLastColumn() < 3) return;
+  if (String(sh.getRange(1, 3).getValue()) !== 'খরচের তালিকা') return;
+  var n = sh.getLastRow() - 1;
+  var vals = n > 0 ? sh.getRange(2, 1, n, 4).getValues() : [];
+  var rows = [];
+  vals.forEach(function (r) { rows = rows.concat(expandExpense_(r[0], r[1], r[2])); });
+  sh.clear();
+  formatSheet_(sh, 'Expenses');
+  if (rows.length) {
+    ensureRows_(sh, rows.length + 1);
+    var rg = sh.getRange(2, 1, rows.length, 4);
+    rg.setNumberFormat('@');
+    rg.setValues(rows);
+  }
 }
