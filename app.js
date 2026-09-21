@@ -243,7 +243,7 @@ function renderDashboard() {
   S.members.forEach(m => { assessed += calcAssessed(m, t); due += Math.max(0, dueOf(m, t)); });
   const collected = sum(S.collections, 'paid');
   const special = sum(S.special, 'amount');
-  const spent = sum(S.expenses, 'paid');
+  const spent = sum(S.expenses, 'total');
   const cash = collected + special - spent;
   const net = collected + special - spent;
   const cards = [
@@ -699,7 +699,6 @@ function resetExpForm() {
   $('eId').value = '';
   $('eVoucher').value = bn(nextNo(S.expenses, 'voucherNo'));
   $('eDate').value = todayISO();
-  $('ePaid').value = '';
   dynLoad('exp', []);
   $('eTitle').textContent = 'নতুন খরচ ভাউচার';
   $('eCancel').style.display = 'none'; closeForm('e');
@@ -707,14 +706,13 @@ function resetExpForm() {
 function calcExp() {
   const total = DYN.exp.rows.reduce((s, r) => s + num(r.amt), 0);
   $('eTotal').textContent = taka(total);
-  $('eDue').textContent = taka(total - num($('ePaid').value));
 }
 async function saveExp() {
   const items = DYN.exp.rows.filter(r => r.desc.trim() || num(r.amt)).map(r => ({ d: r.desc.trim(), a: num(r.amt) }));
   if (!$('eDate').value) { toast('তারিখ দিন', true); return; }
   if (!items.length) { toast('কমপক্ষে একটি খরচের বিবরণ দিন', true); return; }
-  const total = items.reduce((s, r) => s + r.a, 0), paid = num($('ePaid').value);
-  const rec = { id: $('eId').value, date: $('eDate').value, items: JSON.stringify(items), total: String(total), paid: String(paid), due: String(total - paid) };
+  const total = items.reduce((s, r) => s + r.a, 0);
+  const rec = { id: $('eId').value, date: $('eDate').value, items: JSON.stringify(items), total: String(total) };
   const j = await api({ action: 'save', sheet: 'Expenses', record: rec }); if (!j) return;
   upsert(S.expenses, j.record); cacheSave();
   resetExpForm(); refreshAll(); toast('ভাউচার সংরক্ষিত হয়েছে');
@@ -724,7 +722,7 @@ function editExp(id) {
   const x = S.expenses.find(v => v.id === id); if (!x) return;
   $('eId').value = x.id; $('eVoucher').value = bn(x.voucherNo); $('eDate').value = x.date;
   dynLoad('exp', parseJ(x.items, []).map(i => ({ desc: i.d, amt: String(i.a) })));
-  $('ePaid').value = num(x.paid); calcExp();
+  calcExp();
   $('eTitle').textContent = 'খরচ ভাউচার সংশোধন';
   $('eCancel').style.display = ''; openForm('e');
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -741,9 +739,8 @@ function renderExp() {
   const rows = S.expenses.slice().sort(byNoDesc('voucherNo')).filter(x => !q || has(q, [x.voucherNo, x.items]));
   $('eBody').innerHTML = rows.length ? rows.map(x => `<tr>
     <td data-l="ভাউচার নং">${bn(x.voucherNo)}</td><td data-l="তারিখ">${fdate(x.date)}</td><td data-l="সর্বমোট"><b>${taka(x.total)}</b></td>
-    <td data-l="পরিশোধ">${taka(x.paid)}</td><td data-l="বকেয়া">${taka(x.due)}</td>
     <td class="act"><button class="ib" title="এডিট" onclick="editExp('${x.id}')">${icon('edit', 17)}</button><button class="ib" title="প্রিন্ট" onclick="printVoucher('${x.id}')">${icon('print', 17)}</button><button class="ib del" title="ডিলেট" onclick="delExp('${x.id}')">${icon('trash', 17)}</button></td></tr>`).join('')
-    : '<tr><td colspan="6" class="empty">কোনো ভাউচার পাওয়া যায়নি</td></tr>';
+    : '<tr><td colspan="4" class="empty">কোনো ভাউচার পাওয়া যায়নি</td></tr>';
 }
 function printVoucher(id) {
   const x = S.expenses.find(v => v.id === id); if (!x) return;
@@ -753,17 +750,15 @@ function printVoucher(id) {
     <table><thead><tr><th style="width:60px">ক্রম</th><th>বিবরণ</th><th class="r" style="width:130px">টাকা</th></tr></thead><tbody>
     ${items.map((i, n) => `<tr><td>${bn(n + 1)}</td><td>${esc(i.d)}</td><td class="r">${bn(num(i.a))}</td></tr>`).join('')}
     </tbody></table>
-    <table class="sum"><tr><td><b>সর্বমোট</b></td><td class="r"><b>${taka(x.total)}</b></td></tr>
-    <tr><td>পরিশোধ</td><td class="r">${taka(x.paid)}</td></tr>
-    <tr><td>বকেয়া</td><td class="r">${taka(x.due)}</td></tr></table>
+    <table class="sum"><tr><td><b>সর্বমোট</b></td><td class="r"><b>${taka(x.total)}</b></td></tr></table>
     ${sigBlock('ক্যাশিয়ার', 'সভাপতি')}`);
 }
 function printExpList() {
   const rows = S.expenses.slice().sort(byNoDesc('voucherNo')).reverse();
   printDoc(docHeader() + `<div class="dt u"><span>খরচের তালিকা</span></div>
-    <table><thead><tr><th>ভাউচার নং</th><th>তারিখ</th><th>বিবরণ</th><th class="r">সর্বমোট</th><th class="r">পরিশোধ</th><th class="r">বকেয়া</th></tr></thead><tbody>
-    ${rows.map(x => `<tr><td>${bn(x.voucherNo)}</td><td>${fdate(x.date)}</td><td>${esc(parseJ(x.items, []).map(i => i.d).filter(Boolean).join(', '))}</td><td class="r">${bn(num(x.total))}</td><td class="r">${bn(num(x.paid))}</td><td class="r">${bn(num(x.due))}</td></tr>`).join('')}
-    <tr><td colspan="3" class="r"><b>সর্বমোট</b></td><td class="r"><b>${bn(sum(rows, 'total'))}</b></td><td class="r"><b>${bn(sum(rows, 'paid'))}</b></td><td class="r"><b>${bn(sum(rows, 'due'))}</b></td></tr>
+    <table><thead><tr><th>ভাউচার নং</th><th>তারিখ</th><th>বিবরণ</th><th class="r">সর্বমোট</th></tr></thead><tbody>
+    ${rows.map(x => `<tr><td>${bn(x.voucherNo)}</td><td>${fdate(x.date)}</td><td>${esc(parseJ(x.items, []).map(i => i.d).filter(Boolean).join(', '))}</td><td class="r">${bn(num(x.total))}</td></tr>`).join('')}
+    <tr><td colspan="3" class="r"><b>সর্বমোট</b></td><td class="r"><b>${bn(sum(rows, 'total'))}</b></td></tr>
     </tbody></table>${listFoot()}`);
 }
 
@@ -815,7 +810,7 @@ function reportCalc(type, y, m) {
   });
   const coll = sum(S.collections.filter(c => upto(c.date)), 'paid');
   const spec = sum(S.special.filter(x => upto(x.date)), 'amount');
-  const exp = sum(S.expenses.filter(x => upto(x.date)), 'paid');
+  const exp = sum(S.expenses.filter(x => upto(x.date)), 'total');
   const net = coll + spec - exp;
   return { assessed, coll, spec, due, exp, cash: net, net };
 }
@@ -908,7 +903,6 @@ function rpEntries() {
       const h = (i.d || '').trim() || 'অন্যান্য';
       exp.push({ d: v.date, no: bn(v.voucherNo), n, ord: 0, head: h, desc: h, amt: num(i.a) });
     });
-    if (num(v.due) > 0) exp.push({ d: v.date, no: bn(v.voucherNo), n, ord: 1, head: 'অপরিশোধিত বকেয়া (বাদ)', desc: 'অপরিশোধিত বকেয়া (বাদ)', amt: -num(v.due) });
   });
   const cmp = (a, b) => (a.d || '').localeCompare(b.d || '') || a.ord - b.ord || a.n - b.n;
   return { inc: inc.sort(cmp), exp: exp.sort(cmp) };

@@ -34,8 +34,8 @@ var SHEETS = {
     labels: ['রশিদ নং', 'তারিখ', 'নাম', 'মোবাইল নং', 'ঠিকানা', 'বিবরণ', 'টাকা']
   },
   Expenses: {
-    keys:   ['voucherNo', 'date', 'items', 'total', 'paid', 'due'],
-    labels: ['ভাউচার নং', 'তারিখ', 'খরচের তালিকা', 'সর্বমোট', 'পরিশোধ', 'বকেয়া']
+    keys:   ['voucherNo', 'date', 'items', 'total'],
+    labels: ['ভাউচার নং', 'তারিখ', 'খরচের তালিকা', 'সর্বমোট']
   },
   Notices: {
     keys:   ['noticeNo', 'date', 'title', 'details'],
@@ -54,6 +54,7 @@ var LOCKED = { Notices: true };
 
 function setup() {
   migrateV1();
+  migrateV2();
   Object.keys(SHEETS).forEach(function (n) { sheet_(n); });
   var def = ss_().getSheetByName('Sheet1');
   if (def && def.getLastRow() === 0 && ss_().getSheets().length > 1) ss_().deleteSheet(def);
@@ -303,7 +304,7 @@ function migrateV1() {
     return [r[1], r[2], mid, r[5], r[6], r[7], r[8], r[9], r[10]];
   });
   var nS = oS && oS.map(function (r) { return r.slice(1, 8); });
-  var nE = oE && oE.map(function (r) { return r.slice(1, 7); });
+  var nE = oE && oE.map(function (r) { return r.slice(1, 5); });
   var nN = oN && oN.map(function (r, i) { return [String(i + 1), r[1], r[2], r[3]]; });
 
   [['Members', nM], ['Collections', nC], ['Special', nS], ['Expenses', nE], ['Notices', nN]].forEach(function (p) {
@@ -318,4 +319,12 @@ function migrateV1() {
       rg.setValues(rows.map(function (r) { return r.slice(0, w).map(str_); }));
     }
   });
+}
+
+/* ---------- খরচ শীট থেকে "পরিশোধ" ও "বকেয়া" কলাম বাদ ---------- */
+
+function migrateV2() {
+  var sh = ss_().getSheetByName('Expenses');
+  if (!sh || sh.getLastColumn() <= 4) return;
+  sh.deleteColumns(5, sh.getLastColumn() - 4);
 }

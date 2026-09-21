@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=10">
+<link rel="stylesheet" href="style.css?v=11">
 </head>
 <body>
 
@@ -173,8 +173,6 @@
       <button class="btn ghost sm" onclick="dynAdd('exp')"><i data-ic="plus"></i> সারি যোগ করুন</button>
       <div class="tot">
         <div><span>সর্বমোট</span><b id="eTotal">৳ ০</b></div>
-        <div><span>পরিশোধ</span><input id="ePaid" inputmode="decimal" oninput="calcExp()" placeholder="০"></div>
-        <div><span>বকেয়া</span><b id="eDue">৳ ০</b></div>
       </div>
       <div class="btns">
         <button class="btn" onclick="saveExp()">সংরক্ষণ করুন</button>
@@ -189,7 +187,7 @@
       </div>
       <div class="tw">
         <table class="rt">
-          <thead><tr><th>ভাউচার নং</th><th>তারিখ</th><th>সর্বমোট</th><th>পরিশোধ</th><th>বকেয়া</th><th></th></tr></thead>
+          <thead><tr><th>ভাউচার নং</th><th>তারিখ</th><th>সর্বমোট</th><th></th></tr></thead>
           <tbody id="eBody"></tbody>
         </table>
       </div>
@@ -414,6 +412,6 @@
 <div id="toast" class="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="app.js?v=10"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>
