@@ -33,7 +33,7 @@ const nextMemberId = () => ID_PREFIX + String(S.members.reduce((m, x) => Math.ma
 const KEYS = { members: 'memberId', collections: 'receiptNo', special: 'receiptNo', expenses: 'voucherNo', notices: 'noticeNo' };
 const SHEET_KEY = { Members: 'memberId', Collections: 'receiptNo', Special: 'receiptNo', Expenses: 'voucherNo', Notices: 'noticeNo' };
 function normalize() { Object.keys(KEYS).forEach(k => (S[k] || []).forEach(x => { x.id = x[KEYS[k]]; })); }
-const byNoDesc = f => (a, b) => (parseInt(b[f]) || 0) - (parseInt(a[f]) || 0);
+const byNo = f => (a, b) => (parseInt(a[f]) || 0) - (parseInt(b[f]) || 0);
 const findMember = id => S.members.find(m => m.id === id);
 const upsert = (list, rec) => { const i = list.findIndex(x => x.id === rec.id); if (i < 0) list.push(rec); else list[i] = rec; };
 const sum = (list, f) => list.reduce((s, x) => s + num(x[f]), 0);
@@ -268,8 +268,28 @@ function docHeader(sm) {
     <div class="tx"><h1>${esc(s.name || 'সংস্থার নাম')}</h1>${line1 ? `<p>${line1}</p>` : ''}${s.address ? `<p>${esc(s.address)}</p>` : ''}${line3 ? `<p>${line3}</p>` : ''}</div>
     ${s.logo ? '<div style="width:64px"></div>' : ''}</div>`;
 }
+const CENTER_HEADS = ['ক্রম', 'রশিদ নং', 'ভাউচার নং', 'সদস্য আইডি', 'নোটিশ নং'];
+function centerCols(root) {
+  root.querySelectorAll('table').forEach(t => {
+    const hr = t.tHead && t.tHead.rows[t.tHead.rows.length - 1]; if (!hr) return;
+    const idx = [];
+    Array.from(hr.cells).forEach((th, i) => { if (CENTER_HEADS.includes(th.textContent.trim())) { idx.push(i); th.style.textAlign = 'center'; } });
+    if (!idx.length) return;
+    Array.from(t.tBodies).forEach(tb => Array.from(tb.rows).forEach(r => {
+      if (Array.from(r.cells).some(c => c.colSpan > 1)) return;
+      idx.forEach(i => { if (r.cells[i]) r.cells[i].style.textAlign = 'center'; });
+    }));
+  });
+}
+let _cc = 0;
+function watchCenter() {
+  const main = document.querySelector('main.wrap'); if (!main) return;
+  new MutationObserver(() => { cancelAnimationFrame(_cc); _cc = requestAnimationFrame(() => centerCols(main)); }).observe(main, { childList: true, subtree: true });
+  centerCols(main);
+}
 function printDoc(html, bw) {
   $('printArea').innerHTML = bw ? '<div class="bw">' + html + '</div>' : html;
+  centerCols($('printArea'));
   setTimeout(() => window.print(), 150);
 }
 const listFoot = () => `<div class="foot">প্রিন্টের তারিখ: ${fdate(todayISO())}</div>`;
@@ -364,18 +384,18 @@ async function delMember(id) {
 function renderMembers() {
   const q = query('mSearch');
   const rows = S.members.slice().sort(bySerial).filter(m => !q || has(q, [m.memberId, m.name, m.mobile, m.occupation, m.address]));
-  $('mBody').innerHTML = rows.length ? rows.map(m => `<tr>
-    <td data-l="সদস্য আইডি"><b>${esc(m.memberId)}</b></td><td data-l="তারিখ">${fdate(m.date)}</td><td data-l="নাম"><b>${esc(m.name)}</b></td>
+  $('mBody').innerHTML = rows.length ? rows.map((m, i) => `<tr>
+    <td data-l="ক্রম">${bn(i + 1)}</td><td data-l="সদস্য আইডি"><b>${esc(m.memberId)}</b></td><td data-l="তারিখ">${fdate(m.date)}</td><td data-l="নাম"><b>${esc(m.name)}</b></td>
     <td data-l="মোবাইল">${bn(esc(m.mobile))}</td><td data-l="পেশা">${esc(m.occupation)}</td><td data-l="ধার্য্য">${taka(m.fee)}</td><td data-l="ঠিকানা">${esc(m.address)}</td>
     <td class="act"><button class="ib" title="এডিট" onclick="editMember('${m.id}')">${icon('edit', 17)}</button><button class="ib del" title="ডিলেট" onclick="delMember('${m.id}')">${icon('trash', 17)}</button></td></tr>`).join('')
-    : '<tr><td colspan="8" class="empty">কোনো সদস্য পাওয়া যায়নি</td></tr>';
+    : '<tr><td colspan="9" class="empty">কোনো সদস্য পাওয়া যায়নি</td></tr>';
 }
 function printMembers() {
   const rows = S.members.slice().sort(bySerial);
   printDoc(docHeader() + `<div class="dt u"><span>সদস্য তালিকা</span></div>
     <div class="meta"><span>মোট সদস্য: ${bn(rows.length)} জন</span><span>তারিখ: ${fdate(todayISO())}</span></div>
-    <table><thead><tr><th>সদস্য আইডি</th><th>তারিখ</th><th>নাম</th><th>মোবাইল</th><th>পেশা</th><th class="r">ধার্য্য</th><th>ঠিকানা</th></tr></thead><tbody>
-    ${rows.map(m => `<tr><td>${esc(m.memberId)}</td><td>${fdate(m.date)}</td><td>${esc(m.name)}</td><td>${bn(esc(m.mobile))}</td><td>${esc(m.occupation)}</td><td class="r">${bn(num(m.fee))}</td><td>${esc(m.address)}</td></tr>`).join('')}
+    <table><thead><tr><th>ক্রম</th><th>সদস্য আইডি</th><th>তারিখ</th><th>নাম</th><th>মোবাইল</th><th>পেশা</th><th class="r">ধার্য্য</th><th>ঠিকানা</th></tr></thead><tbody>
+    ${rows.map((m, i) => `<tr><td>${bn(i + 1)}</td><td>${esc(m.memberId)}</td><td>${fdate(m.date)}</td><td>${esc(m.name)}</td><td>${bn(esc(m.mobile))}</td><td>${esc(m.occupation)}</td><td class="r">${bn(num(m.fee))}</td><td>${esc(m.address)}</td></tr>`).join('')}
     </tbody></table>${listFoot()}`);
 }
 
@@ -393,14 +413,14 @@ function resetCollForm() {
   $('cReceipt').value = bn(nextNo(S.collections, 'receiptNo'));
   $('cDate').value = todayISO();
   fillMemberSelect(); $('cMember').value = '';
-  ['cSerial', 'cMobile', 'cAddr', 'cFee', 'cDue', 'cPaid', 'cRemain'].forEach(i => $(i).value = '');
+  ['cName', 'cMobile', 'cAddr', 'cFee', 'cDue', 'cPaid', 'cRemain'].forEach(i => $(i).value = '');
   $('cTitle').textContent = 'নতুন চাঁদা আদায়';
   $('cCancel').style.display = 'none'; closeForm('c');
 }
 function onMemberPick() {
   const m = findMember($('cMember').value);
-  if (!m) { ['cSerial', 'cMobile', 'cAddr', 'cFee', 'cDue', 'cRemain'].forEach(i => $(i).value = ''); return; }
-  $('cSerial').value = m.memberId; $('cMobile').value = bn(m.mobile); $('cAddr').value = m.address;
+  if (!m) { ['cName', 'cMobile', 'cAddr', 'cFee', 'cDue', 'cRemain'].forEach(i => $(i).value = ''); return; }
+  $('cName').value = m.name; $('cMobile').value = bn(m.mobile); $('cAddr').value = m.address;
   $('cFee').value = bn(num(m.fee));
   recalcDue();
 }
@@ -450,12 +470,12 @@ async function delColl(id) {
 const collName = c => { const m = findMember(c.memberId); return m ? m.name : c.name; };
 function renderColl() {
   const q = query('cSearch');
-  const rows = S.collections.slice().sort(byNoDesc('receiptNo')).filter(c => !q || has(q, [c.receiptNo, collName(c), c.memberId, c.mobile]));
-  $('cBody').innerHTML = rows.length ? rows.map(c => `<tr>
-    <td data-l="রশিদ নং">${bn(c.receiptNo)}</td><td data-l="তারিখ">${fdate(c.date)}</td><td data-l="নাম"><b>${esc(collName(c))}</b></td>
-    <td data-l="সদস্য আইডি">${esc(c.memberId)}</td><td data-l="ধার্য্য">${taka(c.fee)}</td><td data-l="পূর্ব বকেয়া">${taka(c.dueBefore)}</td><td data-l="পরিশোধ"><b>${taka(c.paid)}</b></td>
+  const rows = S.collections.slice().sort(byNo('receiptNo')).filter(c => !q || has(q, [c.receiptNo, collName(c), c.memberId, c.mobile]));
+  $('cBody').innerHTML = rows.length ? rows.map((c, i) => `<tr>
+    <td data-l="ক্রম">${bn(i + 1)}</td><td data-l="রশিদ নং">${bn(c.receiptNo)}</td><td data-l="তারিখ">${fdate(c.date)}</td><td data-l="সদস্য আইডি">${esc(c.memberId)}</td><td data-l="নাম"><b>${esc(collName(c))}</b></td>
+    <td data-l="ধার্য্য">${taka(c.fee)}</td><td data-l="পূর্ব বকেয়া">${taka(c.dueBefore)}</td><td data-l="পরিশোধ"><b>${taka(c.paid)}</b></td>
     <td class="act"><button class="ib" title="এডিট" onclick="editColl('${c.id}')">${icon('edit', 17)}</button><button class="ib" title="প্রিন্ট" onclick="printReceipt('${c.id}')">${icon('print', 17)}</button><button class="ib" title="শেয়ার" onclick="openShare('coll','${c.id}')">${icon('share', 17)}</button><button class="ib del" title="ডিলেট" onclick="delColl('${c.id}')">${icon('trash', 17)}</button></td></tr>`).join('')
-    : '<tr><td colspan="8" class="empty">কোনো আদায় পাওয়া যায়নি</td></tr>';
+    : '<tr><td colspan="9" class="empty">কোনো আদায় পাওয়া যায়নি</td></tr>';
 }
 function receiptHtml(c, copy) {
   const remain = num(c.dueBefore) - num(c.paid);
@@ -463,7 +483,8 @@ function receiptHtml(c, copy) {
     <div class="dt u" style="margin:4px 0"><span>জমা রশিদ</span>${copy ? `<span class="cp">${copy}</span>` : ''}</div>
     <div class="meta"><span>রশিদ নং: <b>${bn(c.receiptNo)}</b></span><span>তারিখ: <b>${fdate(c.date)}</b></span></div>
     <table class="kvt">
-      <tr><td>সদস্যের নাম</td><td>${esc(collName(c))} (সদস্য আইডি: ${esc(c.memberId)})</td></tr>
+      <tr><td>সদস্য আইডি</td><td>${esc(c.memberId)}</td></tr>
+      <tr><td>সদস্যের নাম</td><td>${esc(collName(c))}</td></tr>
       <tr><td>মোবাইল নং</td><td>${bn(esc(c.mobile))}</td></tr>
       <tr><td>ঠিকানা</td><td>${esc(c.address)}</td></tr>
     </table>
@@ -476,11 +497,11 @@ function printReceipt(id) {
   printDoc(receiptHtml(c, ''));
 }
 function printCollList() {
-  const rows = S.collections.slice().sort(byNoDesc('receiptNo')).reverse();
+  const rows = S.collections.slice().sort(byNo('receiptNo'));
   printDoc(docHeader() + `<div class="dt u"><span>সদস্য চাঁদা আদায় তালিকা</span></div>
-    <table><thead><tr><th>রশিদ নং</th><th>তারিখ</th><th>নাম</th><th>সদস্য আইডি</th><th class="r">ধার্য্য</th><th class="r">পূর্ব বকেয়া</th><th class="r">পরিশোধ</th></tr></thead><tbody>
-    ${rows.map(c => `<tr><td>${bn(c.receiptNo)}</td><td>${fdate(c.date)}</td><td>${esc(collName(c))}</td><td>${esc(c.memberId)}</td><td class="r">${bn(num(c.fee))}</td><td class="r">${bn(num(c.dueBefore))}</td><td class="r">${bn(num(c.paid))}</td></tr>`).join('')}
-    <tr><td colspan="6" class="r"><b>সর্বমোট</b></td><td class="r"><b>${taka(sum(rows, 'paid'))}</b></td></tr>
+    <table><thead><tr><th>ক্রম</th><th>রশিদ নং</th><th>তারিখ</th><th>সদস্য আইডি</th><th>নাম</th><th class="r">ধার্য্য</th><th class="r">পূর্ব বকেয়া</th><th class="r">পরিশোধ</th></tr></thead><tbody>
+    ${rows.map((c, i) => `<tr><td>${bn(i + 1)}</td><td>${bn(c.receiptNo)}</td><td>${fdate(c.date)}</td><td>${esc(c.memberId)}</td><td>${esc(collName(c))}</td><td class="r">${bn(num(c.fee))}</td><td class="r">${bn(num(c.dueBefore))}</td><td class="r">${bn(num(c.paid))}</td></tr>`).join('')}
+    <tr><td colspan="7" class="r"><b>সর্বমোট</b></td><td class="r"><b>${taka(sum(rows, 'paid'))}</b></td></tr>
     </tbody></table>${listFoot()}`);
 }
 
@@ -495,9 +516,9 @@ function printDueList() {
   const tot = k => rows.reduce((s, r) => s + r[k], 0);
   printDoc(docHeader() + `<div class="dt u"><span>সদস্যভিত্তিক বকেয়া তালিকা</span></div>
     <div class="meta"><span>বকেয়া সদস্য: ${bn(rows.length)} জন</span><span>তারিখ: ${fdate(t)}</span></div>
-    <table><thead><tr><th>সদস্য আইডি</th><th>নাম</th><th>মোবাইল নং</th><th class="r">ধার্য্য</th><th class="r">মোট</th><th class="r">পরিশোধ</th><th class="r">বকেয়া</th></tr></thead><tbody>
-    ${rows.map(r => `<tr><td>${esc(r.m.memberId)}</td><td>${esc(r.m.name)}</td><td>${bn(esc(r.m.mobile))}</td><td class="r">${bn(num(r.m.fee))}</td><td class="r">${bn(r.total)}</td><td class="r">${bn(r.paid)}</td><td class="r"><b>${bn(r.due)}</b></td></tr>`).join('')}
-    <tr><td colspan="4" class="r"><b>সর্বমোট</b></td><td class="r"><b>${bn(tot('total'))}</b></td><td class="r"><b>${bn(tot('paid'))}</b></td><td class="r"><b>${bn(tot('due'))}</b></td></tr>
+    <table><thead><tr><th>ক্রম</th><th>সদস্য আইডি</th><th>নাম</th><th>মোবাইল নং</th><th class="r">ধার্য্য</th><th class="r">মোট</th><th class="r">পরিশোধ</th><th class="r">বকেয়া</th></tr></thead><tbody>
+    ${rows.map((r, i) => `<tr><td>${bn(i + 1)}</td><td>${esc(r.m.memberId)}</td><td>${esc(r.m.name)}</td><td>${bn(esc(r.m.mobile))}</td><td class="r">${bn(num(r.m.fee))}</td><td class="r">${bn(r.total)}</td><td class="r">${bn(r.paid)}</td><td class="r"><b>${bn(r.due)}</b></td></tr>`).join('')}
+    <tr><td colspan="5" class="r"><b>সর্বমোট</b></td><td class="r"><b>${bn(tot('total'))}</b></td><td class="r"><b>${bn(tot('paid'))}</b></td><td class="r"><b>${bn(tot('due'))}</b></td></tr>
     </tbody></table>${listFoot()}`);
 }
 
@@ -542,12 +563,12 @@ async function delSpecial(id) {
 }
 function renderSpecial() {
   const q = query('sSearch');
-  const rows = S.special.slice().sort(byNoDesc('receiptNo')).filter(x => !q || has(q, [x.receiptNo, x.name, x.mobile, x.description]));
-  $('sBody').innerHTML = rows.length ? rows.map(x => `<tr>
-    <td data-l="রশিদ নং">${bn(x.receiptNo)}</td><td data-l="তারিখ">${fdate(x.date)}</td><td data-l="নাম"><b>${esc(x.name)}</b></td>
+  const rows = S.special.slice().sort(byNo('receiptNo')).filter(x => !q || has(q, [x.receiptNo, x.name, x.mobile, x.description]));
+  $('sBody').innerHTML = rows.length ? rows.map((x, i) => `<tr>
+    <td data-l="ক্রম">${bn(i + 1)}</td><td data-l="রশিদ নং">${bn(x.receiptNo)}</td><td data-l="তারিখ">${fdate(x.date)}</td><td data-l="নাম"><b>${esc(x.name)}</b></td>
     <td data-l="মোবাইল">${bn(esc(x.mobile))}</td><td data-l="বিবরণ">${esc(x.description)}</td><td data-l="টাকা"><b>${taka(x.amount)}</b></td>
     <td class="act"><button class="ib" title="এডিট" onclick="editSpecial('${x.id}')">${icon('edit', 17)}</button><button class="ib" title="প্রিন্ট" onclick="printSpecial('${x.id}')">${icon('print', 17)}</button><button class="ib" title="শেয়ার" onclick="openShare('special','${x.id}')">${icon('share', 17)}</button><button class="ib del" title="ডিলেট" onclick="delSpecial('${x.id}')">${icon('trash', 17)}</button></td></tr>`).join('')
-    : '<tr><td colspan="7" class="empty">কোনো রেকর্ড পাওয়া যায়নি</td></tr>';
+    : '<tr><td colspan="8" class="empty">কোনো রেকর্ড পাওয়া যায়নি</td></tr>';
 }
 function specialHtml(x, copy) {
   return `<div class="rcpt">${docHeader(true)}
@@ -567,11 +588,11 @@ function printSpecial(id) {
   printDoc(specialHtml(x, ''));
 }
 function printSpecialList() {
-  const rows = S.special.slice().sort(byNoDesc('receiptNo')).reverse();
+  const rows = S.special.slice().sort(byNo('receiptNo'));
   printDoc(docHeader() + `<div class="dt u"><span>বিশেষ কালেকশন তালিকা</span></div>
-    <table><thead><tr><th>রশিদ নং</th><th>তারিখ</th><th>নাম</th><th>মোবাইল</th><th>ঠিকানা</th><th>বিবরণ</th><th class="r">টাকা</th></tr></thead><tbody>
-    ${rows.map(x => `<tr><td>${bn(x.receiptNo)}</td><td>${fdate(x.date)}</td><td>${esc(x.name)}</td><td>${bn(esc(x.mobile))}</td><td>${esc(x.address)}</td><td>${esc(x.description)}</td><td class="r">${bn(num(x.amount))}</td></tr>`).join('')}
-    <tr><td colspan="6" class="r"><b>সর্বমোট</b></td><td class="r"><b>${taka(sum(rows, 'amount'))}</b></td></tr>
+    <table><thead><tr><th>ক্রম</th><th>রশিদ নং</th><th>তারিখ</th><th>নাম</th><th>মোবাইল</th><th>ঠিকানা</th><th>বিবরণ</th><th class="r">টাকা</th></tr></thead><tbody>
+    ${rows.map((x, i) => `<tr><td>${bn(i + 1)}</td><td>${bn(x.receiptNo)}</td><td>${fdate(x.date)}</td><td>${esc(x.name)}</td><td>${bn(esc(x.mobile))}</td><td>${esc(x.address)}</td><td>${esc(x.description)}</td><td class="r">${bn(num(x.amount))}</td></tr>`).join('')}
+    <tr><td colspan="7" class="r"><b>সর্বমোট</b></td><td class="r"><b>${taka(sum(rows, 'amount'))}</b></td></tr>
     </tbody></table>${listFoot()}`);
 }
 
@@ -736,11 +757,11 @@ async function delExp(id) {
 }
 function renderExp() {
   const q = query('eSearch');
-  const rows = S.expenses.slice().sort(byNoDesc('voucherNo')).filter(x => !q || has(q, [x.voucherNo, x.items]));
-  $('eBody').innerHTML = rows.length ? rows.map(x => `<tr>
-    <td data-l="ভাউচার নং">${bn(x.voucherNo)}</td><td data-l="তারিখ">${fdate(x.date)}</td><td data-l="সর্বমোট"><b>${taka(x.total)}</b></td>
+  const rows = S.expenses.slice().sort(byNo('voucherNo')).filter(x => !q || has(q, [x.voucherNo, x.items]));
+  $('eBody').innerHTML = rows.length ? rows.map((x, i) => `<tr>
+    <td data-l="ক্রম">${bn(i + 1)}</td><td data-l="ভাউচার নং">${bn(x.voucherNo)}</td><td data-l="তারিখ">${fdate(x.date)}</td><td data-l="সর্বমোট"><b>${taka(x.total)}</b></td>
     <td class="act"><button class="ib" title="এডিট" onclick="editExp('${x.id}')">${icon('edit', 17)}</button><button class="ib" title="প্রিন্ট" onclick="printVoucher('${x.id}')">${icon('print', 17)}</button><button class="ib del" title="ডিলেট" onclick="delExp('${x.id}')">${icon('trash', 17)}</button></td></tr>`).join('')
-    : '<tr><td colspan="4" class="empty">কোনো ভাউচার পাওয়া যায়নি</td></tr>';
+    : '<tr><td colspan="5" class="empty">কোনো ভাউচার পাওয়া যায়নি</td></tr>';
 }
 function printVoucher(id) {
   const x = S.expenses.find(v => v.id === id); if (!x) return;
@@ -754,11 +775,11 @@ function printVoucher(id) {
     ${sigBlock('ক্যাশিয়ার', 'সভাপতি')}`);
 }
 function printExpList() {
-  const rows = S.expenses.slice().sort(byNoDesc('voucherNo')).reverse();
+  const rows = S.expenses.slice().sort(byNo('voucherNo'));
   printDoc(docHeader() + `<div class="dt u"><span>খরচের তালিকা</span></div>
-    <table><thead><tr><th>ভাউচার নং</th><th>তারিখ</th><th>বিবরণ</th><th class="r">সর্বমোট</th></tr></thead><tbody>
-    ${rows.map(x => `<tr><td>${bn(x.voucherNo)}</td><td>${fdate(x.date)}</td><td>${esc(parseJ(x.items, []).map(i => i.d).filter(Boolean).join(', '))}</td><td class="r">${bn(num(x.total))}</td></tr>`).join('')}
-    <tr><td colspan="3" class="r"><b>সর্বমোট</b></td><td class="r"><b>${bn(sum(rows, 'total'))}</b></td></tr>
+    <table><thead><tr><th>ক্রম</th><th>ভাউচার নং</th><th>তারিখ</th><th>বিবরণ</th><th class="r">সর্বমোট</th></tr></thead><tbody>
+    ${rows.map((x, i) => `<tr><td>${bn(i + 1)}</td><td>${bn(x.voucherNo)}</td><td>${fdate(x.date)}</td><td>${esc(parseJ(x.items, []).map(i => i.d).filter(Boolean).join(', '))}</td><td class="r">${bn(num(x.total))}</td></tr>`).join('')}
+    <tr><td colspan="4" class="r"><b>সর্বমোট</b></td><td class="r"><b>${bn(sum(rows, 'total'))}</b></td></tr>
     </tbody></table>${listFoot()}`);
 }
 
@@ -1019,11 +1040,11 @@ function printCommittee() {
 /* =====================================================================
    নোটিশ (দেখা ও প্রিন্ট)
    ===================================================================== */
-const sortedNotices = () => S.notices.slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+const sortedNotices = () => S.notices.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '') || (parseInt(a.noticeNo) || 0) - (parseInt(b.noticeNo) || 0));
 function renderNotices() {
   const list = sortedNotices();
   $('nList').innerHTML = list.length
-    ? list.map(n => `<button class="nitem" onclick="viewNotice('${n.id}')"><span class="nd">${fdate(n.date)}</span><span class="nt">${esc(n.title)}</span></button>`).join('')
+    ? list.map((n, i) => `<button class="nitem" onclick="viewNotice('${n.id}')"><span class="nd">${bn(i + 1)}। ${fdate(n.date)}</span><span class="nt">${esc(n.title)}</span></button>`).join('')
     : '<div class="card empty">কোনো নোটিশ নেই</div>';
   renderNoticeAdmin();
 }
@@ -1145,10 +1166,10 @@ async function delNotice(id) {
 }
 function renderNoticeAdmin() {
   const list = sortedNotices();
-  $('nfBody').innerHTML = list.length ? list.map(n => `<tr>
-    <td data-l="নোটিশ নং">${bn(n.noticeNo)}</td><td data-l="তারিখ">${fdate(n.date)}</td><td data-l="শিরোনাম"><b>${esc(n.title)}</b></td>
+  $('nfBody').innerHTML = list.length ? list.map((n, i) => `<tr>
+    <td data-l="ক্রম">${bn(i + 1)}</td><td data-l="নোটিশ নং">${bn(n.noticeNo)}</td><td data-l="তারিখ">${fdate(n.date)}</td><td data-l="শিরোনাম"><b>${esc(n.title)}</b></td>
     <td class="act"><button class="ib" title="এডিট" onclick="editNotice('${n.id}')">${icon('edit', 17)}</button><button class="ib del" title="ডিলেট" onclick="delNotice('${n.id}')">${icon('trash', 17)}</button></td></tr>`).join('')
-    : '<tr><td colspan="4" class="empty">কোনো নোটিশ নেই</td></tr>';
+    : '<tr><td colspan="5" class="empty">কোনো নোটিশ নেই</td></tr>';
 }
 
 /* ---------- ফরম খোলা/বন্ধ (বাটন) ---------- */
@@ -1165,7 +1186,7 @@ function hydrateIcons() {
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeSide(); closePw(); closeShare(); } });
 document.addEventListener('DOMContentLoaded', () => {
-  hydrateIcons(); buildMenu();
+  hydrateIcons(); buildMenu(); watchCenter();
   resetMemberForm(); resetCollForm(); resetSpecialForm(); resetExpForm(); initReport(); initRp('cr'); initRp('lg');
   loadData();
 });
