@@ -10,7 +10,7 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbxgZOPwcGzB1blmHXEacgRP
 
 const ID_PREFIX = 'ASP';   // সদস্য আইডির শুরু (Code.gs এর ID_PREFIX এর সাথে মিল রাখুন)
 const CACHE_KEY = 'samity_cache_v2';
-const S = { settings: {}, members: [], collections: [], special: [], expenses: [], notices: [], feeChanges: [] };
+const S = { settings: {}, members: [], collections: [], special: [], expenses: [], notices: [], feeChanges: [], programs: [] };
 const PROTECTED = ['setup', 'committeeForm', 'noticeForm'];
 let curPage = 'dashboard';
 
@@ -30,8 +30,8 @@ const idNum = v => parseInt(String(v || '').replace(/\D/g, ''), 10) || 0;
 const bySerial = (a, b) => idNum(a.memberId) - idNum(b.memberId);
 const nextMemberId = () => ID_PREFIX + String(S.members.reduce((m, x) => Math.max(m, idNum(x.memberId)), 0) + 1).padStart(4, '0');
 // শীটে id কলাম নেই; মেমোরিতে id = প্রথম কলামের নম্বর/আইডি
-const KEYS = { members: 'memberId', collections: 'receiptNo', special: 'receiptNo', expenses: 'voucherNo', notices: 'noticeNo', feeChanges: 'incNo' };
-const SHEET_KEY = { Members: 'memberId', Collections: 'receiptNo', Special: 'receiptNo', Expenses: 'voucherNo', Notices: 'noticeNo', FeeChanges: 'incNo' };
+const KEYS = { members: 'memberId', collections: 'receiptNo', special: 'receiptNo', expenses: 'voucherNo', notices: 'noticeNo', feeChanges: 'incNo', programs: 'serial' };
+const SHEET_KEY = { Members: 'memberId', Collections: 'receiptNo', Special: 'receiptNo', Expenses: 'voucherNo', Notices: 'noticeNo', FeeChanges: 'incNo', Programs: 'serial' };
 function normalize() { Object.keys(KEYS).forEach(k => (S[k] || []).forEach(x => { x.id = x[KEYS[k]]; })); }
 const byNo = f => (a, b) => (parseInt(a[f]) || 0) - (parseInt(b[f]) || 0);
 const findMember = id => S.members.find(m => m.id === id);
@@ -85,6 +85,24 @@ let writing = false;
 const TOK = {};
 const newToken = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 
+// নেটওয়ার্ক: সময়সীমা + স্বয়ংক্রিয় পুনরায় চেষ্টা (৩ বার)। ধীর সংযোগ বা Google এর সাময়িক ত্রুটিতেও কাজ চালিয়ে যায়।
+async function fetchJson(url, opts, tries) {
+  tries = tries || 3;
+  let lastErr;
+  for (let i = 0; i < tries; i++) {
+    const ctl = new AbortController();
+    const to = setTimeout(() => ctl.abort(), 30000);
+    try {
+      const r = await fetch(url, Object.assign({ signal: ctl.signal }, opts));
+      const j = JSON.parse(await r.text());        // HTML ত্রুটি পাতা এলে এখানে ব্যতিক্রম হয়
+      return { j, retried: i > 0 };
+    } catch (e) { lastErr = e; }
+    finally { clearTimeout(to); }
+    if (i < tries - 1) await new Promise(res => setTimeout(res, 900 * (i + 1)));
+  }
+  throw lastErr;
+}
+
 async function api(payload, quiet) {
   if (!apiReady()) { toast('app.js এ API_URL বসানো হয়নি', true); return null; }
   const isWrite = payload.action === 'save' || payload.action === 'delete';
@@ -96,11 +114,14 @@ async function api(payload, quiet) {
   const tk = payload.sheet + ':' + ((payload.record && payload.record.memberId) || '');
   if (isNew) payload.record.token = TOK[tk] || (TOK[tk] = newToken());
   busy(true);
+  const slow = setTimeout(() => toast('সার্ভার সাড়া দিতে একটু দেরি হচ্ছে, অপেক্ষা করুন…'), 7000);
   try {
     const body = Object.assign({ pw: sessionStorage.getItem('pw') || '' }, payload);
-    const r = await fetch(API_URL, { method: 'POST', body: JSON.stringify(body) });
-    const j = await r.json();
+    // পাসওয়ার্ড পরিবর্তন ছাড়া বাকি সবই নিরাপদে পুনরায় পাঠানো যায় (নতুন এন্ট্রিতে টোকেন থাকায় ডাবল হয় না)
+    const { j, retried } = await fetchJson(API_URL, { method: 'POST', body: JSON.stringify(body) }, payload.action === 'changePassword' ? 1 : 3);
     if (!j.ok) {
+      // ডিলেট সফল হয়েও উত্তর হারালে পুনরায় চেষ্টায় "পাওয়া যায়নি" আসে; সেটিকে সফল ধরে ডেটা মিলিয়ে নেওয়া হয়
+      if (payload.action === 'delete' && retried && /পাওয়া যায়নি/.test(j.error || '')) { setTimeout(() => loadData(), 0); return { ok: true, resync: true }; }
       if (j.code === 'AUTH') lockNow(true);
       if (!quiet) toast(j.error || 'সমস্যা হয়েছে', true);
       return null;
@@ -109,15 +130,16 @@ async function api(payload, quiet) {
     if (isNew) delete TOK[tk];           // সফল হলে পরের এন্ট্রির জন্য নতুন টোকেন
     return j;
   } catch (e) {
-    if (!quiet) toast('সার্ভারের সাথে সংযোগ হয়নি', true);
+    if (!quiet) toast(isWrite ? 'সংযোগে সমস্যা হয়েছে। আবার সংরক্ষণ চাপুন — ডাবল এন্ট্রি হবে না।' : 'সার্ভারের সাথে সংযোগ হয়নি। ইন্টারনেট দেখে আবার চেষ্টা করুন।', true);
     return null;
   } finally {
+    clearTimeout(slow);
     busy(false);
     if (isWrite) { writing = false; document.body.classList.remove('saving'); }
   }
 }
 
-const DATA_KEYS = ['settings', 'members', 'collections', 'special', 'expenses', 'notices', 'feeChanges'];
+const DATA_KEYS = ['settings', 'members', 'collections', 'special', 'expenses', 'notices', 'feeChanges', 'programs'];
 function cacheSave() {
   try {
     const o = {}; DATA_KEYS.forEach(k => o[k] = S[k]);
@@ -125,22 +147,33 @@ function cacheSave() {
   } catch (e) { /* ক্যাশ পূর্ণ হলে উপেক্ষা */ }
 }
 
-async function loadData() {
-  try {
-    const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
-    if (c) DATA_KEYS.forEach(k => { if (c[k]) S[k] = c[k]; });
-  } catch (e) { /* ignore */ }
-  normalize();
-  refreshAll();
-  if (!apiReady()) { toast('app.js এ API_URL বসানো হয়নি', true); return; }
+let loadingNow = false, lastLoad = 0, autoRetry = 0;
+async function loadData(initial) {
+  if (loadingNow) return;
+  loadingNow = true;
+  let hadCache = false;
+  if (initial) {
+    try {
+      const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+      if (c) { hadCache = true; DATA_KEYS.forEach(k => { if (c[k]) S[k] = c[k]; }); }
+    } catch (e) { /* ignore */ }
+    normalize();
+    refreshAll();          // সংরক্ষিত ডেটা সাথে সাথে দেখানো হয়, নতুনটা পেছনে লোড হয়
+  }
+  if (!apiReady()) { toast('app.js এ API_URL বসানো হয়নি', true); loadingNow = false; return; }
   busy(true);
   try {
-    const r = await fetch(API_URL + '?action=getAll');
-    const j = await r.json();
-    if (j.ok) { DATA_KEYS.forEach(k => S[k] = j[k] || (k === 'settings' ? {} : [])); normalize(); cacheSave(); refreshAll(); }
-    else toast(j.error || 'ডেটা লোড হয়নি', true);
-  } catch (e) { toast('সার্ভারের সাথে সংযোগ হয়নি', true); }
-  finally { busy(false); }
+    const { j } = await fetchJson(API_URL + '?action=getAll', {}, 3);
+    if (j.ok) {
+      DATA_KEYS.forEach(k => S[k] = j[k] || (k === 'settings' ? {} : []));
+      normalize(); cacheSave(); refreshAll();
+      lastLoad = Date.now(); autoRetry = 0;
+    } else toast(j.error || 'ডেটা লোড হয়নি', true);
+  } catch (e) {
+    const have = hadCache || S.members.length > 0;
+    toast(have ? 'সার্ভার এখন সাড়া দিচ্ছে না — সংরক্ষিত ডেটা দেখানো হচ্ছে' : 'সার্ভারের সাথে সংযোগ হয়নি। ইন্টারনেট দেখুন।', !have);
+    if (autoRetry++ < 3) setTimeout(() => loadData(), 10000);   // পেছনে আবার চেষ্টা
+  } finally { busy(false); loadingNow = false; }
 }
 
 /* ---------- সাইডমেনু ---------- */
@@ -150,6 +183,7 @@ const MENU = [
   { g: 'members', t: 'সদস্য', i: 'users', ch: [{ id: 'memberEntry', t: 'সদস্য এন্ট্রি ফরম' }, { id: 'collection', t: 'সদস্য চাঁদা আদায়' }] },
   { id: 'special', t: 'বিশেষ', i: 'star' },
   { id: 'expense', t: 'খরচ', i: 'receipt' },
+  { id: 'program', t: 'কর্মসূচি', i: 'committee' },
   { g: 'reports', t: 'রিপোর্ট', i: 'chart', ch: [{ id: 'report', t: 'শর্ট রিপোর্ট' }, { id: 'cashReport', t: 'ক্যাশ রিপোর্ট' }, { id: 'ledger', t: 'লেজার' }] },
   { id: 'committee', t: 'কমিটি', i: 'committee' },
   { id: 'notices', t: 'নোটিশ', i: 'bell' },
@@ -182,6 +216,7 @@ function go(id) {
   if (id === 'special') resetSpecialForm();
   if (id === 'expense') resetExpForm();
   if (id === 'notices') showNoticeList();
+  if (id === 'program') resetProgramForm();
   if (id === 'setup') fillSetup();
   if (id === 'committeeForm') fillCommitteeForm();
   if (id === 'noticeForm') resetNoticeForm();
@@ -215,7 +250,7 @@ function lockNow(silent) {
 function refreshAll() {
   renderChrome(); renderDashboard();
   renderMembers(); renderFee(); fillMemberSelect(); renderColl(); renderSpecial(); renderExp();
-  renderAbout(); renderCommittee(); renderNotices(); fillReportYears(); renderReport(); renderCash(); renderLedger();
+  renderAbout(); renderCommittee(); renderNotices(); renderProgram(); fillReportYears(); renderReport(); renderCash(); renderLedger();
   refreshNos();
 }
 function refreshNos() {
@@ -272,24 +307,47 @@ const dueOf = (m, asOf, excludeId) => calcAssessed(m, asOf) - paidBy(m.id, exclu
 
 /* ---------- ড্যাশবোর্ড ---------- */
 function renderDashboard() {
-  const t = todayISO();
-  let assessed = 0, due = 0;
-  S.members.forEach(m => { assessed += calcAssessed(m, t); due += Math.max(0, dueOf(m, t)); });
-  const collected = sum(S.collections, 'paid');
-  const special = sum(S.special, 'amount');
-  const spent = sum(S.expenses, 'total');
-  const cash = collected + special - spent;
-  const net = collected + special - spent;
-  const cards = [
-    { l: 'মোট সদস্য', v: bn(S.members.length) + ' জন', i: 'users' },
-    { l: 'মোট ধার্য্য', v: taka(assessed), i: 'org' },
-    { l: 'মোট আদায়', v: taka(collected), i: 'coin' },
-    { l: 'মোট বকেয়া', v: taka(due), i: 'bell', c: 'due' },
-    { l: 'মোট খরচ', v: taka(spent), i: 'receipt' },
-    { l: net >= 0 ? 'উদ্বৃত্ত' : 'ঘাটতি', v: taka(Math.abs(net)), i: 'chart', c: net >= 0 ? 'plus' : 'due' },
-    { l: 'বর্তমান ক্যাশ', v: taka(cash), i: 'wallet', c: 'cash', s: 'সদস্য আদায় + বিশেষ কালেকশন − খরচ' }
+  const t = todayISO(), nowIdx = monthIdx(t), now = new Date();
+  const inMonth = iso => monthIdx(iso) === nowIdx;
+  let assessed = 0, due = 0, mAssessed = 0, mDue = 0;
+  S.members.forEach(m => {
+    const a = assessedTo(m, nowIdx), ma = a - assessedTo(m, nowIdx - 1);
+    assessed += a; mAssessed += ma;
+    due += Math.max(0, a - paidBy(m.id));
+    const mp = S.collections.filter(c => c.memberId === m.memberId && inMonth(c.date)).reduce((s, c) => s + num(c.paid), 0);
+    mDue += Math.max(0, ma - mp);     // চলতি মাসের বকেয়া = এ মাসের ধার্য্য − এ মাসে সদস্যের পরিশোধ
+  });
+  const noFee = S.members.filter(m => num(m.fee) <= 0).length;   // মাসিক ধার্য্য লেখা হয়নি এমন সদস্য
+  const coll = sum(S.collections, 'paid'), spec = sum(S.special, 'amount'), spent = sum(S.expenses, 'total');
+  const mColl = sum(S.collections.filter(c => inMonth(c.date)), 'paid');
+  const mSpec = sum(S.special.filter(x => inMonth(x.date)), 'amount');
+  const mSpent = sum(S.expenses.filter(x => inMonth(x.date)), 'total');
+  const net = coll + spec - spent, mNet = mColl + mSpec - mSpent;
+  const card = c => `<div class="stat ${c.c || ''}"><span>${icon(c.i, 18)}${c.l}</span><b>${c.v}</b>${c.s ? `<small>${c.s}</small>` : ''}</div>`;
+  const netCard = (label, v) => ({ l: (v >= 0 ? 'উদ্বৃত্ত' : 'ঘাটতি') + label, v: taka(Math.abs(v)), i: 'chart', c: v >= 0 ? 'plus' : 'due' });
+  const month = [
+    { l: 'মোট ধার্য্য', v: taka(mAssessed), i: 'org' },
+    { l: 'মোট আদায়', v: taka(mColl), i: 'receipt' },
+    { l: 'মোট বকেয়া', v: taka(mDue), i: 'bell', c: 'due' },
+    { l: 'মোট বিশেষ কালেকশন', v: taka(mSpec), i: 'star' },
+    { l: 'মোট খরচ', v: taka(mSpent), i: 'receipt' },
+    netCard(' (এ মাসের)', mNet)
   ];
-  $('stats').innerHTML = cards.map(c => `<div class="stat ${c.c || ''}"><span>${icon(c.i === 'coin' ? 'receipt' : c.i, 18)}${c.l}</span><b>${c.v}</b>${c.s ? `<small>${c.s}</small>` : ''}</div>`).join('');
+  const total = [
+    { l: 'মোট ধার্য্য', v: taka(assessed), i: 'org' },
+    { l: 'মোট আদায়', v: taka(coll), i: 'receipt' },
+    { l: 'মোট বকেয়া', v: taka(due), i: 'bell', c: 'due' },
+    { l: 'মোট বিশেষ কালেকশন', v: taka(spec), i: 'star' },
+    { l: 'মোট খরচ', v: taka(spent), i: 'receipt' },
+    netCard(' (বর্তমান)', net),
+    { l: 'বর্তমান ক্যাশ', v: taka(net), i: 'wallet', c: 'cash', s: 'সদস্য আদায় + বিশেষ কালেকশন − খরচ' }
+  ];
+  $('stats').innerHTML =
+    `<div class="stats">${card({ l: 'মোট সদস্য', v: bn(S.members.length) + ' জন', i: 'users' })}${card({ l: 'মোট ধার্য্য হয়নি', v: bn(noFee) + ' জন', i: 'bell', c: noFee > 0 ? 'due' : '', s: 'মাসিক ধার্য্য লেখা হয়নি' })}</div>
+     <h3 class="sec">চলতি মাস <small>${MONTHS[now.getMonth()]} ${bn(now.getFullYear())}</small></h3>
+     <div class="stats">${month.map(card).join('')}</div>
+     <h3 class="sec">সর্বমোট <small>শুরু থেকে আজ পর্যন্ত</small></h3>
+     <div class="stats">${total.map(card).join('')}</div>`;
 }
 
 /* ---------- প্রিন্ট ---------- */
@@ -307,11 +365,12 @@ function centerCols(root) {
   root.querySelectorAll('table').forEach(t => {
     const hr = t.tHead && t.tHead.rows[t.tHead.rows.length - 1]; if (!hr) return;
     const idx = [];
-    Array.from(hr.cells).forEach((th, i) => { if (CENTER_HEADS.includes(th.textContent.trim())) { idx.push(i); th.style.textAlign = 'center'; } });
+    let col = 0;
+    Array.from(hr.cells).forEach(th => { if (CENTER_HEADS.includes(th.textContent.trim())) { idx.push(col); th.style.textAlign = 'center'; } col += th.colSpan; });
     if (!idx.length) return;
     Array.from(t.tBodies).forEach(tb => Array.from(tb.rows).forEach(r => {
-      if (Array.from(r.cells).some(c => c.colSpan > 1)) return;
-      idx.forEach(i => { if (r.cells[i]) r.cells[i].style.textAlign = 'center'; });
+      let c = 0;
+      Array.from(r.cells).forEach(cell => { if (cell.colSpan === 1 && idx.includes(c)) cell.style.textAlign = 'center'; c += cell.colSpan; });
     }));
   });
 }
@@ -961,11 +1020,11 @@ function rpEntries() {
   const inc = [], exp = [];
   S.collections.forEach(c => inc.push({
     d: c.date, no: bn(c.receiptNo), n: parseInt(c.receiptNo) || 0, ord: 0, head: 'সদস্য চাঁদা',
-    desc: collName(c) + ' (' + c.memberId + ') — সদস্য চাঁদা', amt: num(c.paid)
+    desc: collName(c) + ' (' + c.memberId + ')', amt: num(c.paid)
   }));
   S.special.forEach(x => inc.push({
     d: x.date, no: 'বি-' + bn(x.receiptNo), n: parseInt(x.receiptNo) || 0, ord: 1,
-    head: (x.description || '').trim() || 'বিশেষ কালেকশন', desc: x.name + (x.description ? ' — ' + x.description : ''), amt: num(x.amount)
+    head: (x.description || '').trim() || 'বিশেষ কালেকশন', desc: x.name, amt: num(x.amount)
   }));
   S.expenses.forEach(v => {
     const n = parseInt(v.voucherNo) || 0;
@@ -988,22 +1047,60 @@ const SBS_GAP = '<td class="gap"></td>';
 function netRow(ti, te, cols) {
   return `<tr class="net"><td colspan="${cols}" class="r">${ti >= te ? 'উদ্বৃত্ত' : 'ঘাটতি'} (আয় − ব্যয়): ${taka(Math.abs(ti - te))}</td></tr>`;
 }
+const HEAD_FIRST = 'সদস্য চাঁদা';
+// খাত অনুযায়ী ভাগ: "সদস্য চাঁদা" আগে, বাকিগুলো প্রথম আসার ক্রমে
+function groupByHead(list) {
+  const order = [], mp = {};
+  list.forEach(x => { if (!mp[x.head]) { mp[x.head] = []; order.push(x.head); } mp[x.head].push(x); });
+  order.sort((a, b) => (a === HEAD_FIRST ? 0 : 1) - (b === HEAD_FIRST ? 0 : 1));
+  return order.map(h => ({ head: h, items: mp[h] }));
+}
+function cashCells(L) {
+  if (!L || L.t === 'blank') return '<td></td><td></td><td></td>';
+  if (L.t === 'head') return `<td colspan="3" class="hd">${esc(L.text)}</td>`;
+  if (L.t === 'sub') return `<td colspan="2" class="r st">${esc(L.text)}</td><td class="r st">${amt(L.v)}</td>`;
+  return `<td>${L.x.no}</td><td>${esc(L.x.desc)}</td><td class="r">${amt(L.x.amt)}</td>`;
+}
 function cashHtml(s) {
-  const e = rpEntries(), inc = e.inc.filter(x => inPeriod(x, s)), exp = e.exp.filter(x => inPeriod(x, s));
-  const n = Math.max(inc.length, exp.length);
-  if (!n) return '<div class="empty">এই সময়ে কোনো লেনদেন নেই</div>';
+  const e = rpEntries();
+  const inc = e.inc.filter(x => inPeriod(x, s)), exp = e.exp.filter(x => inPeriod(x, s));
+  // গত মাস/বছর পর্যন্ত জের (আয় − ব্যয়)
+  const start = s.type === 'month' ? s.y * 12 + s.m - 1 : s.type === 'year' ? s.y * 12 : null;
+  const before = x => { const i = monthIdx(x.d); return start !== null && i !== null && i < start; };
+  const prevNet = start === null ? 0 : sum(e.inc.filter(before), 'amt') - sum(e.exp.filter(before), 'amt');
+  if (!inc.length && !exp.length && !prevNet) return '<div class="empty">এই সময়ে কোনো লেনদেন নেই</div>';
+
+  // আয়: প্রতিটি খাতের হেডার → এন্ট্রি → "মোট" সারি → ফাঁকা সারি
+  const left = [];
+  groupByHead(inc).forEach((g, gi) => {
+    if (gi) left.push({ t: 'blank' });
+    left.push({ t: 'head', text: g.head });
+    g.items.forEach(x => left.push({ t: 'row', x }));
+    left.push({ t: 'sub', text: 'মোট ' + g.head, v: sum(g.items, 'amt') });
+  });
+  const right = exp.map(x => ({ t: 'row', x }));
+  const n = Math.max(left.length, right.length);
+  while (left.length < n) left.push({ t: 'blank' });
+  while (right.length < n) right.push({ t: 'blank' });
   let r = '';
-  for (let i = 0; i < n; i++) {
-    const a = inc[i], b = exp[i];
-    r += `<tr><td>${a ? a.no : ''}</td><td>${a ? esc(a.desc) : ''}</td><td class="r">${a ? amt(a.amt) : ''}</td>${SBS_GAP}<td>${b ? b.no : ''}</td><td>${b ? esc(b.desc) : ''}</td><td class="r">${b ? amt(b.amt) : ''}</td></tr>`;
-  }
+  for (let i = 0; i < n; i++) r += `<tr>${cashCells(left[i])}${SBS_GAP}${cashCells(right[i])}</tr>`;
+
+  // নিচের যোগফল অংশ: দুই দিকের সারি একই লাইনে
   const ti = sum(inc, 'amt'), te = sum(exp, 'amt');
+  const TI = ti + Math.max(prevNet, 0), TE = te + Math.max(-prevNet, 0);
+  const per = s.type === 'month' ? 'গত মাসের' : 'গত বছরের';
+  const pairs = [];
+  if (s.type !== 'all') pairs.push([{ t: 'sub', text: 'সবখাতের যোগফল', v: ti }, { t: 'sub', text: 'মোট খরচ', v: te }]);
+  if (prevNet > 0) pairs.push([{ t: 'sub', text: per + ' উদ্বৃত্ত', v: prevNet }, null]);
+  if (prevNet < 0) pairs.push([null, { t: 'sub', text: per + ' ঘাটতি', v: -prevNet }]);
+  pairs.push([{ t: 'sub', text: 'সর্বমোট আয়', v: TI }, { t: 'sub', text: 'সর্বমোট ব্যয়', v: TE }]);
+  pairs.forEach(pr => { r += `<tr class="tt">${cashCells(pr[0])}${SBS_GAP}${cashCells(pr[1])}</tr>`; });
+
   return `<table class="sbs"><colgroup><col style="width:9%"><col style="width:29%"><col style="width:11%"><col style="width:2%"><col style="width:9%"><col style="width:29%"><col style="width:11%"></colgroup><thead>
     <tr><th colspan="3" class="c">আয়</th><th class="gap"></th><th colspan="3" class="c">ব্যয়</th></tr>
     <tr><th>রশিদ নং</th><th>বিবরণ</th><th class="r">টাকা</th><th class="gap"></th><th>ভাউচার নং</th><th>বিবরণ</th><th class="r">টাকা</th></tr></thead>
     <tbody>${r}
-    <tr class="tt"><td colspan="2" class="r">সর্বমোট আয়</td><td class="r">${amt(ti)}</td>${SBS_GAP}<td colspan="2" class="r">সর্বমোট ব্যয়</td><td class="r">${amt(te)}</td></tr>
-    ${netRow(ti, te, 7)}</tbody></table>`;
+    <tr class="net"><td colspan="7" class="r">বর্তমান ${TI >= TE ? 'উদ্বৃত্ত' : 'ঘাটতি'}: ${taka(Math.abs(TI - TE))}</td></tr></tbody></table>`;
 }
 function renderCash() {
   if (!$('crOut')) return;
@@ -1012,43 +1109,46 @@ function renderCash() {
   $('crOut').innerHTML = cashHtml(s);
 }
 
-// লেজার: খাতভিত্তিক মোট
-function ledgerGroups(s) {
-  const e = rpEntries();
-  const agg = list => { const mp = {}; list.forEach(x => { mp[x.head] = (mp[x.head] || 0) + x.amt; }); return Object.keys(mp).map(k => [k, mp[k]]).sort((a, b) => b[1] - a[1]); };
+// লেজার: মাসিক = খাত ও মোট; বাৎসরিক = খাত, তার নিচে মাসভিত্তিক মোট; সর্বমোট = খাত, তার নিচে বছরভিত্তিক মোট
+function ledgerSide(list, s) {
+  const byTot = (heads, tot) => Object.keys(heads).sort((a, b) => (a === HEAD_FIRST ? 0 : 1) - (b === HEAD_FIRST ? 0 : 1) || tot(b) - tot(a));
   if (s.type === 'month') {
-    const f = x => inPeriod(x, s);
-    return [{ label: '', inc: agg(e.inc.filter(f)), exp: agg(e.exp.filter(f)) }];
+    const mp = {};
+    list.forEach(x => { mp[x.head] = (mp[x.head] || 0) + x.amt; });
+    return byTot(mp, h => mp[h]).map(h => ({ t: 'row', a: h, b: mp[h] }));
   }
   const keyOf = s.type === 'year' ? x => monthIdx(x.d) : x => Math.floor(monthIdx(x.d) / 12);
-  const ki = e.inc.filter(x => inPeriod(x, s)), ke = e.exp.filter(x => inPeriod(x, s));
-  const keys = Array.from(new Set(ki.concat(ke).map(keyOf))).sort((a, b) => a - b);
-  return keys.map(k => ({
-    label: s.type === 'year' ? MONTHS[k % 12] + ' ' + bn(s.y) : bn(k) + ' সাল',
-    inc: agg(ki.filter(x => keyOf(x) === k)), exp: agg(ke.filter(x => keyOf(x) === k))
-  }));
+  const label = k => s.type === 'year' ? MONTHS[k % 12] : bn(k) + ' সাল';
+  const heads = {};
+  list.forEach(x => {
+    const h = heads[x.head] = heads[x.head] || { tot: 0, per: {} }, k = keyOf(x);
+    h.tot += x.amt; h.per[k] = (h.per[k] || 0) + x.amt;
+  });
+  const lines = [];
+  byTot(heads, h => heads[h].tot).forEach((h, i) => {
+    if (i) lines.push({ t: 'blank' });
+    lines.push({ t: 'head', a: h });
+    Object.keys(heads[h].per).map(Number).sort((a, b) => a - b).forEach(k => lines.push({ t: 'row', a: label(k), b: heads[h].per[k] }));
+  });
+  return lines;
 }
 function ledgerHtml(s) {
-  const groups = ledgerGroups(s);
-  if (!groups.length || groups.every(g => !g.inc.length && !g.exp.length)) return '<div class="empty">এই সময়ে কোনো লেনদেন নেই</div>';
-  const tot = l => l.reduce((a, r) => a + r[1], 0);
-  let ti = 0, te = 0, r = '';
-  groups.forEach(g => {
-    if (g.label) r += `<tr class="grp"><td colspan="5">${g.label}</td></tr>`;
-    const n = Math.max(g.inc.length, g.exp.length);
-    for (let i = 0; i < n; i++) {
-      const a = g.inc[i], b = g.exp[i];
-      r += `<tr><td>${a ? esc(a[0]) : ''}</td><td class="r">${a ? amt(a[1]) : ''}</td>${SBS_GAP}<td>${b ? esc(b[0]) : ''}</td><td class="r">${b ? amt(b[1]) : ''}</td></tr>`;
-    }
-    const gi = tot(g.inc), ge = tot(g.exp); ti += gi; te += ge;
-    if (g.label) r += `<tr class="sub"><td class="r">মোট আয়</td><td class="r">${amt(gi)}</td>${SBS_GAP}<td class="r">মোট ব্যয়</td><td class="r">${amt(ge)}</td></tr>`;
-  });
+  const e = rpEntries(), inc = e.inc.filter(x => inPeriod(x, s)), exp = e.exp.filter(x => inPeriod(x, s));
+  if (!inc.length && !exp.length) return '<div class="empty">এই সময়ে কোনো লেনদেন নেই</div>';
+  const L = ledgerSide(inc, s), R = ledgerSide(exp, s);
+  const cell = x => !x || x.t === 'blank' ? '<td></td><td></td>'
+    : x.t === 'head' ? `<td colspan="2" class="hd">${esc(x.a)}</td>`
+    : `<td>${esc(x.a)}</td><td class="r">${amt(x.b)}</td>`;
+  let r = '';
+  for (let i = 0, n = Math.max(L.length, R.length); i < n; i++) r += `<tr>${cell(L[i])}${SBS_GAP}${cell(R[i])}</tr>`;
+  const ti = sum(inc, 'amt'), te = sum(exp, 'amt');
+  const col = { month: 'খাত', year: 'খাত / মাস', all: 'খাত / বছর' }[s.type];
   return `<table class="sbs"><colgroup><col style="width:34%"><col style="width:15%"><col style="width:2%"><col style="width:34%"><col style="width:15%"></colgroup><thead>
     <tr><th colspan="2" class="c">আয়</th><th class="gap"></th><th colspan="2" class="c">ব্যয়</th></tr>
-    <tr><th>খাত</th><th class="r">টাকা</th><th class="gap"></th><th>খাত</th><th class="r">টাকা</th></tr></thead>
+    <tr><th>${col}</th><th class="r">টাকা</th><th class="gap"></th><th>${col}</th><th class="r">টাকা</th></tr></thead>
     <tbody>${r}
     <tr class="tt"><td class="r">সর্বমোট আয়</td><td class="r">${amt(ti)}</td>${SBS_GAP}<td class="r">সর্বমোট ব্যয়</td><td class="r">${amt(te)}</td></tr>
-    ${netRow(ti, te, 5)}</tbody></table>`;
+    <tr class="net"><td colspan="5" class="r">বর্তমান ${ti >= te ? 'উদ্বৃত্ত' : 'ঘাটতি'}: ${taka(Math.abs(ti - te))}</td></tr></tbody></table>`;
 }
 function renderLedger() {
   if (!$('lgOut')) return;
@@ -1222,6 +1322,73 @@ function renderNoticeAdmin() {
 }
 
 /* =====================================================================
+   কর্মসূচি
+   ===================================================================== */
+function resetProgramForm() {
+  $('pgId').value = '';
+  $('pgSerial').value = bn(nextNo(S.programs, 'serial'));
+  $('pgDate').value = todayISO();
+  ['pgName', 'pgSponsor', 'pgBenef'].forEach(i => $(i).value = '');
+  $('pgTitle').textContent = 'নতুন কর্মসূচি';
+  $('pgCancel').style.display = 'none';
+  closeForm('pg');
+}
+async function saveProgram() {
+  const rec = {
+    id: $('pgId').value, name: $('pgName').value.trim(), date: $('pgDate').value,
+    sponsor: $('pgSponsor').value.trim(), beneficiary: $('pgBenef').value.trim()
+  };
+  if (!rec.name || !rec.date) { toast('কর্মসূচির নাম ও তারিখ আবশ্যক', true); return; }
+  const j = await api({ action: 'save', sheet: 'Programs', record: rec }); if (!j) return;
+  upsert(S.programs, j.record); cacheSave();
+  resetProgramForm(); refreshAll(); toast('কর্মসূচি সংরক্ষিত হয়েছে');
+}
+function editProgram(id) {
+  const x = S.programs.find(v => v.id === id); if (!x) return;
+  $('pgId').value = x.id; $('pgSerial').value = bn(x.serial); $('pgName').value = x.name;
+  $('pgDate').value = x.date; $('pgSponsor').value = x.sponsor; $('pgBenef').value = x.beneficiary;
+  $('pgTitle').textContent = 'কর্মসূচি সংশোধন';
+  $('pgCancel').style.display = '';
+  openForm('pg');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+async function delProgram(id) {
+  if (!confirm('এই কর্মসূচি মুছে ফেলবেন?')) return;
+  const j = await api({ action: 'delete', sheet: 'Programs', id }); if (!j) return;
+  S.programs = S.programs.filter(x => x.id !== id); cacheSave();
+  if ($('pgId').value === id) resetProgramForm();
+  refreshAll(); toast('মুছে ফেলা হয়েছে');
+}
+function renderProgram() {
+  if (!$('pgBody')) return;
+  const q = query('pgSearch');
+  const rows = S.programs.slice().sort(byNo('serial')).filter(x => !q || has(q, [x.serial, x.name, x.sponsor, x.beneficiary]));
+  $('pgBody').innerHTML = rows.length ? rows.map(x => `<tr>
+    <td data-l="ক্রম">${bn(x.serial)}</td><td data-l="কর্মসূচির নাম"><b>${esc(x.name)}</b></td><td data-l="তারিখ">${fdate(x.date)}</td>
+    <td data-l="স্পন্সর">${esc(x.sponsor)}</td><td data-l="উপকৃত হয়েছে">${esc(x.beneficiary)}</td>
+    <td class="act"><button class="ib" title="এডিট" onclick="editProgram('${x.id}')">${icon('edit', 17)}</button><button class="ib" title="প্রিন্ট" onclick="printProgram('${x.id}')">${icon('print', 17)}</button><button class="ib del" title="ডিলেট" onclick="delProgram('${x.id}')">${icon('trash', 17)}</button></td></tr>`).join('')
+    : '<tr><td colspan="6" class="empty">কোনো কর্মসূচি পাওয়া যায়নি</td></tr>';
+}
+function printProgram(id) {
+  const x = S.programs.find(v => v.id === id); if (!x) return;
+  printDoc(docHeader() + `<div class="dt u"><span>কর্মসূচি</span></div>
+    <table class="kvt">
+      <tr><td>ক্রম</td><td>${bn(x.serial)}</td></tr>
+      <tr><td>কর্মসূচির নাম</td><td>${esc(x.name)}</td></tr>
+      <tr><td>তারিখ</td><td>${fdate(x.date)}</td></tr>
+      <tr><td>স্পন্সর</td><td>${esc(x.sponsor)}</td></tr>
+      <tr><td>উপকৃত হয়েছে</td><td>${esc(x.beneficiary)}</td></tr>
+    </table>${listFoot()}`);
+}
+function printProgramList() {
+  const rows = S.programs.slice().sort(byNo('serial'));
+  printDoc(docHeader() + `<div class="dt u"><span>কর্মসূচি তালিকা</span></div>
+    <table><thead><tr><th>ক্রম</th><th>কর্মসূচির নাম</th><th>তারিখ</th><th>স্পন্সর</th><th>উপকৃত হয়েছে</th></tr></thead><tbody>
+    ${rows.map(x => `<tr><td>${bn(x.serial)}</td><td>${esc(x.name)}</td><td>${fdate(x.date)}</td><td>${esc(x.sponsor)}</td><td>${esc(x.beneficiary)}</td></tr>`).join('')}
+    </tbody></table>${listFoot()}`);
+}
+
+/* =====================================================================
    ধার্য্য বৃদ্ধি
    ===================================================================== */
 const FI = {};   // সদস্যভিত্তিক লেখা মান: { inc, date } (রিফ্রেশে হারাবে না)
@@ -1314,7 +1481,7 @@ function resetFeeForm() {
 function openForm(p) { if (p === 'f') closeForm('m'); if (p === 'm') closeForm('f'); $(p + 'FormCard').classList.add('open'); $(p + 'Tog').setAttribute('aria-expanded', 'true'); }
 function closeForm(p) { const c = $(p + 'FormCard'); if (!c) return; c.classList.remove('open'); $(p + 'Tog').setAttribute('aria-expanded', 'false'); }
 function toggleForm(p) {
-  if ($(p + 'FormCard').classList.contains('open')) ({ m: resetMemberForm, c: resetCollForm, s: resetSpecialForm, e: resetExpForm, f: resetFeeForm })[p]();
+  if ($(p + 'FormCard').classList.contains('open')) ({ m: resetMemberForm, c: resetCollForm, s: resetSpecialForm, e: resetExpForm, f: resetFeeForm, pg: resetProgramForm })[p]();
   else openForm(p);
 }
 
@@ -1322,9 +1489,11 @@ function toggleForm(p) {
 function hydrateIcons() {
   document.querySelectorAll('i[data-ic]').forEach(e => { e.outerHTML = icon(e.dataset.ic, 18); });
 }
+// অ্যাপে ফিরে এলে (২ মিনিটের বেশি পর) ডেটা নতুন করে আনা
+document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - lastLoad > 120000 && !writing) loadData(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeSide(); closePw(); closeShare(); } });
 document.addEventListener('DOMContentLoaded', () => {
   hydrateIcons(); buildMenu(); watchCenter();
   resetMemberForm(); resetCollForm(); resetSpecialForm(); resetExpForm(); initReport(); initRp('cr'); initRp('lg');
-  loadData();
+  loadData(true);
 });

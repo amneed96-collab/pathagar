@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=17">
+<link rel="stylesheet" href="style.css?v=22">
 </head>
 <body>
 
@@ -32,7 +32,7 @@
   <!-- ড্যাশবোর্ড -->
   <section class="page active" id="pg-dashboard">
     <div class="ptop"><h2>ড্যাশবোর্ড</h2></div>
-    <div class="stats" id="stats"></div>
+    <div id="stats"></div>
   </section>
 
   <!-- সংস্থা তথ্য -->
@@ -213,6 +213,39 @@
         <table class="rt">
           <thead><tr><th>ভাউচার নং</th><th>তারিখ</th><th>সর্বমোট</th><th></th></tr></thead>
           <tbody id="eBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- কর্মসূচি -->
+  <section class="page" id="pg-program">
+    <div class="ptop"><button class="btn tg" id="pgTog" aria-expanded="false" onclick="toggleForm('pg')"><i data-ic="plus"></i> কর্মসূচি ফরম</button></div>
+    <div class="card fc" id="pgFormCard">
+      <h3 id="pgTitle">নতুন কর্মসূচি</h3>
+      <input type="hidden" id="pgId">
+      <div class="fg">
+        <label>ক্রম (অটো)<input id="pgSerial" readonly></label>
+        <label>কর্মসূচির নাম<input id="pgName"></label>
+        <label>তারিখ<input type="date" id="pgDate"></label>
+        <label>স্পন্সর<input id="pgSponsor"></label>
+        <label>উপকৃত হয়েছে<input id="pgBenef"></label>
+      </div>
+      <div class="btns">
+        <button class="btn" onclick="saveProgram()">সংরক্ষণ করুন</button>
+        <button class="btn ghost" id="pgCancel" onclick="resetProgramForm()" style="display:none">বাতিল</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>কর্মসূচি তালিকা</h3>
+      <div class="tools">
+        <input id="pgSearch" placeholder="নাম, স্পন্সর বা উপকৃতের নাম দিয়ে খুঁজুন" oninput="renderProgram()">
+        <button class="btn ghost" onclick="printProgramList()"><i data-ic="print"></i> প্রিন্ট</button>
+      </div>
+      <div class="tw">
+        <table class="rt">
+          <thead><tr><th>ক্রম</th><th>কর্মসূচির নাম</th><th>তারিখ</th><th>স্পন্সর</th><th>উপকৃত হয়েছে</th><th></th></tr></thead>
+          <tbody id="pgBody"></tbody>
         </table>
       </div>
     </div>
@@ -436,6 +469,6 @@
 <div id="toast" class="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="app.js?v=17"></script>
+<script src="app.js?v=23"></script>
 </body>
 </html>

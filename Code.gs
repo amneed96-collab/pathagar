@@ -45,6 +45,10 @@ var SHEETS = {
     keys:   ['incNo', 'date', 'memberId', 'name', 'mobile', 'address', 'prevFee', 'increase', 'newFee'],
     labels: ['বৃদ্ধি নং', 'তারিখ', 'সদস্য আইডি', 'নাম', 'মোবাইল নং', 'ঠিকানা', 'পূর্ব ধার্য্য', 'বৃদ্ধি', 'নতুন ধার্য্য']
   },
+  Programs: {
+    keys:   ['serial', 'name', 'date', 'sponsor', 'beneficiary'],
+    labels: ['ক্রম', 'কর্মসূচির নাম', 'তারিখ', 'স্পন্সর', 'উপকৃত হয়েছে']
+  },
   Settings: {
     keys:   ['key', 'value'],
     labels: ['বিষয়', 'মান']
@@ -65,9 +69,25 @@ function setup() {
 }
 
 function doGet(e) {
-  var out;
-  try { out = getAll_(); } catch (err) { out = { ok: false, error: String(err.message || err) }; }
-  return json_(out);
+  var s;
+  try { s = getAllJson_(); } catch (err) { s = JSON.stringify({ ok: false, error: String(err.message || err) }); }
+  return ContentService.createTextOutput(s).setMimeType(ContentService.MimeType.JSON);
+}
+
+/* ---------- দ্রুত লোডের জন্য ক্যাশ ---------- */
+// প্রতিটি সংরক্ষণ/ডিলেটের পর 'ver' বদলে যায়, ফলে পুরনো ক্যাশ আর ব্যবহৃত হয় না। সর্বোচ্চ ৬০ সেকেন্ড টিকে।
+function getAllJson_() {
+  var cache = CacheService.getScriptCache();
+  var ver = cache.get('ver') || '0';
+  var hit = cache.get('all_' + ver);
+  if (hit) return hit;
+  var s = JSON.stringify(getAll_());
+  try { if ((cache.get('ver') || '0') === ver) cache.put('all_' + ver, s, 60); } catch (e) { /* ১০০KB এর বেশি হলে ক্যাশ হয় না */ }
+  return s;
+}
+
+function bumpVer_() {
+  try { CacheService.getScriptCache().put('ver', String(new Date().getTime()) + Math.floor(Math.random() * 1000), 21600); } catch (e) { /* ignore */ }
 }
 
 function doPost(e) {
@@ -87,7 +107,15 @@ function json_(o) {
 
 /* ---------- রাউটার ---------- */
 
+var WRITE_ACTIONS = { save: 1, 'delete': 1, saveSettings: 1, changePassword: 1 };
+
 function handle_(req) {
+  var res = route_(req);
+  if (res && res.ok && WRITE_ACTIONS[req.action]) bumpVer_();
+  return res;
+}
+
+function route_(req) {
   var a = req.action;
 
   if (a === 'login') {
@@ -147,7 +175,8 @@ function withLock_(fn) {
 
 /* ---------- শীট সহায়ক ---------- */
 
-function ss_() { return SpreadsheetApp.getActiveSpreadsheet(); }
+var _ss = null, _sh = {};   // একবারের চালনায় স্প্রেডশীট/শীট অবজেক্ট পুনর্ব্যবহার (দ্রুত)
+function ss_() { return _ss || (_ss = SpreadsheetApp.getActiveSpreadsheet()); }
 
 function formatSheet_(sh, name) {
   var def = SHEETS[name], n = def.keys.length;
@@ -159,15 +188,15 @@ function formatSheet_(sh, name) {
 }
 
 function sheet_(name) {
+  if (_sh[name]) return _sh[name];
   var ss = ss_();
   var sh = ss.getSheetByName(name);
   if (!sh) {
     sh = ss.insertSheet(name);
     formatSheet_(sh, name);
     if (name === 'Settings') sh.getRange(2, 1, 1, 2).setValues([['password', DEFAULT_PASSWORD]]);
-  } else if (String(sh.getRange(1, 1).getValue()) === 'id') {
-    throw new Error('শীটের কাঠামো পুরনো। Apps Script এ setup ফাংশন একবার Run করুন।');
   }
+  _sh[name] = sh;
   return sh;
 }
 
@@ -189,6 +218,9 @@ function readAll_(name) {
 }
 
 function getAll_() {
+  if (String(sheet_('Members').getRange(1, 1).getValue()) === 'id') {
+    throw new Error('শীটের কাঠামো পুরনো। Apps Script এ setup ফাংশন একবার Run করুন।');
+  }
   var settings = {};
   readAll_('Settings').forEach(function (r) {
     if (r.key && r.key !== 'password') settings[r.key] = r.value;
@@ -201,6 +233,7 @@ function getAll_() {
     special: readAll_('Special'),
     expenses: groupExpenses_(readAll_('Expenses')),
     feeChanges: readAll_('FeeChanges'),
+    programs: readAll_('Programs'),
     notices: readAll_('Notices')
   };
 }

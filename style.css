@@ -232,7 +232,6 @@ table.dyn td:last-child{width:44px}
   .hd h1{font-size:24px}
   .fg{grid-template-columns:repeat(3,1fr)}
   .stats{grid-template-columns:repeat(3,1fr)}
-  .stat.cash{grid-column:auto}
   .ft-in{grid-template-columns:1fr 1fr}
   .ft-r{justify-content:flex-end}
   .kvs{grid-template-columns:1fr 1fr;column-gap:28px}
@@ -328,3 +327,13 @@ body.saving .btns .btn{pointer-events:none;opacity:.6}
 .ptop.start{justify-content:flex-start;flex-wrap:wrap}
 table.fee input{min-width:110px;padding:6px 8px;min-height:38px}
 table.fee td[data-l="ঠিকানা"]{min-width:150px}
+
+/* ড্যাশবোর্ড বিভাগ */
+h3.sec{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:22px 0 10px;font-size:18px;color:var(--navy)}
+h3.sec small{font-weight:400;color:var(--muted);font-size:14px}
+#stats>.stats:first-child{margin-bottom:0}
+
+/* খাতের হেডার সারি */
+table.sbs td.hd{font-weight:700;text-align:left}
+
+table.sbs td.st{font-weight:700}
