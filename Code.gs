@@ -114,8 +114,19 @@ function handle_(req) {
     if (!SHEETS[name] || name === 'Settings') return { ok: false, error: 'অবৈধ শীট' };
     if (LOCKED[name] && !checkPw_(req.pw)) return authErr_();
     return withLock_(function () {
-      if (name === 'Expenses') return a === 'save' ? saveExpense_(req.record || {}) : deleteExpense_(req.id);
-      return a === 'save' ? saveRecord_(name, req.record || {}) : deleteRecord_(name, req.id);
+      if (a === 'delete') return name === 'Expenses' ? deleteExpense_(req.id) : deleteRecord_(name, req.id);
+
+      var rec = req.record || {};
+      // ডাবল এন্ট্রি প্রতিরোধ: নতুন এন্ট্রির টোকেন আগেই সেভ হয়ে থাকলে আগের ফলাফলই ফেরত যাবে
+      var tokKey = (!rec.id && rec.token) ? 'tok_' + name + '_' + String(rec.token).slice(0, 60) : '';
+      var cache = CacheService.getScriptCache();
+      if (tokKey) {
+        var hit = cache.get(tokKey);
+        if (hit) { try { return JSON.parse(hit); } catch (e) { /* ignore */ } }
+      }
+      var res = name === 'Expenses' ? saveExpense_(rec) : saveRecord_(name, rec);
+      if (tokKey && res.ok) { try { cache.put(tokKey, JSON.stringify(res), 21600); } catch (e) { /* বড় ডেটা হলে উপেক্ষা */ } }
+      return res;
     });
   }
 
@@ -243,6 +254,15 @@ function saveRecord_(name, rec) {
   var row = -1;
   var existing = rec.id ? String(rec.id) : '';
 
+  if (name === 'Members') {                      // ডাবল এন্ট্রি প্রতিরোধ: একই নাম ও মোবাইল নং
+    var nm = normName_(rec.name), mb = normMobile_(rec.mobile);
+    for (var d = 0; d < data.length; d++) {
+      if (String(data[d][0]) !== existing && normName_(data[d][2]) === nm && normMobile_(data[d][3]) === mb) {
+        return { ok: false, error: 'এই সদস্য আগে থেকেই আছেন: ' + data[d][2] + ' (' + data[d][0] + ')' };
+      }
+    }
+  }
+
   if (existing) {
     for (var i = 0; i < data.length; i++) {
       if (String(data[i][0]) === existing) { row = i + 2; break; }
@@ -264,6 +284,15 @@ function saveRecord_(name, rec) {
   var out = {};
   keys.forEach(function (k, i) { out[k] = vals[i]; });
   return { ok: true, record: out };
+}
+
+var BN_DIGITS = '০১২৩৪৫৬৭৮৯';
+function normName_(s) { return String(s || '').replace(/\s+/g, ' ').trim().toLowerCase(); }
+function normMobile_(s) {
+  var d = String(s || '').replace(/[০-৯]/g, function (c) { return BN_DIGITS.indexOf(c); }).replace(/\D/g, '');
+  if (d.indexOf('880') === 0 && d.length === 13) d = '0' + d.slice(3);
+  else if (d.length === 10 && d.charAt(0) === '1') d = '0' + d;
+  return d;
 }
 
 function deleteRecord_(name, id) {

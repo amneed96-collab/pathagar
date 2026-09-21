@@ -79,8 +79,21 @@ const busy = on => $('loader').classList.toggle('show', on);
 /* ---------- সার্ভার যোগাযোগ ---------- */
 const apiReady = () => API_URL.indexOf('http') === 0;
 
+// ডাবল এন্ট্রি প্রতিরোধ: (১) সংরক্ষণ চলাকালীন আরেকটি সংরক্ষণ/ডিলেট চালু হয় না,
+// (২) প্রতিটি নতুন এন্ট্রির জন্য একটি ইউনিক টোকেন যায়; সার্ভার একই টোকেন দ্বিতীয়বার পেলে নতুন সারি বানায় না।
+let writing = false;
+const TOK = {};
+const newToken = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+
 async function api(payload, quiet) {
   if (!apiReady()) { toast('app.js এ API_URL বসানো হয়নি', true); return null; }
+  const isWrite = payload.action === 'save' || payload.action === 'delete';
+  if (isWrite) {
+    if (writing) return null;                       // ডাবল ক্লিক: আগেরটি শেষ না হওয়া পর্যন্ত উপেক্ষা
+    writing = true; document.body.classList.add('saving');
+  }
+  const isNew = payload.action === 'save' && payload.record && !payload.record.id;
+  if (isNew) payload.record.token = TOK[payload.sheet] || (TOK[payload.sheet] = newToken());
   busy(true);
   try {
     const body = Object.assign({ pw: sessionStorage.getItem('pw') || '' }, payload);
@@ -92,11 +105,15 @@ async function api(payload, quiet) {
       return null;
     }
     if (payload.action === 'save' && j.record) j.record.id = j.record[SHEET_KEY[payload.sheet]];
+    if (isNew) delete TOK[payload.sheet];           // সফল হলে পরের এন্ট্রির জন্য নতুন টোকেন
     return j;
   } catch (e) {
     if (!quiet) toast('সার্ভারের সাথে সংযোগ হয়নি', true);
     return null;
-  } finally { busy(false); }
+  } finally {
+    busy(false);
+    if (isWrite) { writing = false; document.body.classList.remove('saving'); }
+  }
 }
 
 const DATA_KEYS = ['settings', 'members', 'collections', 'special', 'expenses', 'notices'];
@@ -351,6 +368,13 @@ function resetMemberForm() {
   $('mTitle').textContent = 'নতুন সদস্য এন্ট্রি';
   $('mCancel').style.display = 'none'; closeForm('m');
 }
+const normName = s => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+function normMobile(s) {
+  let d = en(s).replace(/\D/g, '');
+  if (d.indexOf('880') === 0 && d.length === 13) d = '0' + d.slice(3);
+  else if (d.length === 10 && d[0] === '1') d = '0' + d;
+  return d;
+}
 async function saveMember() {
   const rec = {
     id: $('mId').value, date: $('mDate').value, name: $('mName').value.trim(),
@@ -358,6 +382,13 @@ async function saveMember() {
     fee: String(num($('mFee').value)), address: $('mAddr').value.trim()
   };
   if (!rec.date || !rec.name) { toast('তারিখ ও নাম আবশ্যক', true); return; }
+  // ডাবল এন্ট্রি প্রতিরোধ: নাম ও মোবাইল নং মিলিয়ে দেখা
+  const nm = normName(rec.name), mb = normMobile(rec.mobile);
+  const others = S.members.filter(m => m.id !== rec.id);
+  const same = others.find(m => normName(m.name) === nm && normMobile(m.mobile) === mb);
+  if (same) { toast('এই সদস্য আগে থেকেই আছেন: ' + same.name + ' (' + same.memberId + ')', true); return; }
+  const sameMob = mb && others.find(m => normMobile(m.mobile) === mb);
+  if (sameMob && !confirm('এই মোবাইল নম্বরটি আগে থেকেই "' + sameMob.name + '" (' + sameMob.memberId + ') এর নামে আছে।\nতবুও নতুন সদস্য হিসেবে সংরক্ষণ করবেন?')) return;
   const j = await api({ action: 'save', sheet: 'Members', record: rec });
   if (!j) return;
   upsert(S.members, j.record); cacheSave();

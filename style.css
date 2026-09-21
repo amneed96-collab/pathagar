@@ -320,3 +320,6 @@ table.sbs tr.net td{border:0!important;background:none!important;text-align:righ
 
 /* সব টেবিলের হেডার মাঝ বরাবর (স্ক্রিন ও প্রিন্ট) */
 th,#printArea th,#shotArea th,table.rep th:last-child,table.sbs th.r,#printArea th.r{text-align:center!important}
+
+/* সংরক্ষণ চলাকালীন বাটন নিষ্ক্রিয় */
+body.saving .btns .btn{pointer-events:none;opacity:.6}
