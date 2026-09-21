@@ -41,6 +41,10 @@ var SHEETS = {
     keys:   ['noticeNo', 'date', 'title', 'details'],
     labels: ['নোটিশ নং', 'তারিখ', 'শিরোনাম', 'বিস্তারিত']
   },
+  FeeChanges: {
+    keys:   ['incNo', 'date', 'memberId', 'name', 'mobile', 'address', 'prevFee', 'increase', 'newFee'],
+    labels: ['বৃদ্ধি নং', 'তারিখ', 'সদস্য আইডি', 'নাম', 'মোবাইল নং', 'ঠিকানা', 'পূর্ব ধার্য্য', 'বৃদ্ধি', 'নতুন ধার্য্য']
+  },
   Settings: {
     keys:   ['key', 'value'],
     labels: ['বিষয়', 'মান']
@@ -114,7 +118,7 @@ function handle_(req) {
     if (!SHEETS[name] || name === 'Settings') return { ok: false, error: 'অবৈধ শীট' };
     if (LOCKED[name] && !checkPw_(req.pw)) return authErr_();
     return withLock_(function () {
-      if (a === 'delete') return name === 'Expenses' ? deleteExpense_(req.id) : deleteRecord_(name, req.id);
+      if (a === 'delete') return name === 'Expenses' ? deleteExpense_(req.id) : name === 'FeeChanges' ? deleteFeeChange_(req.id) : deleteRecord_(name, req.id);
 
       var rec = req.record || {};
       // ডাবল এন্ট্রি প্রতিরোধ: নতুন এন্ট্রির টোকেন আগেই সেভ হয়ে থাকলে আগের ফলাফলই ফেরত যাবে
@@ -124,7 +128,7 @@ function handle_(req) {
         var hit = cache.get(tokKey);
         if (hit) { try { return JSON.parse(hit); } catch (e) { /* ignore */ } }
       }
-      var res = name === 'Expenses' ? saveExpense_(rec) : saveRecord_(name, rec);
+      var res = name === 'Expenses' ? saveExpense_(rec) : name === 'FeeChanges' ? saveFeeChange_(rec) : saveRecord_(name, rec);
       if (tokKey && res.ok) { try { cache.put(tokKey, JSON.stringify(res), 21600); } catch (e) { /* বড় ডেটা হলে উপেক্ষা */ } }
       return res;
     });
@@ -196,6 +200,7 @@ function getAll_() {
     collections: readAll_('Collections'),
     special: readAll_('Special'),
     expenses: groupExpenses_(readAll_('Expenses')),
+    feeChanges: readAll_('FeeChanges'),
     notices: readAll_('Notices')
   };
 }
@@ -275,6 +280,11 @@ function saveRecord_(name, rec) {
     row = sh.getLastRow() + 1;
   }
 
+  if (name === 'Members' && existing) {           // ধার্য্য বৃদ্ধির ইতিহাস থাকলে ধার্য্য শুধু বৃদ্ধি ফরম থেকেই বদলাবে
+    var hasInc = readAll_('FeeChanges').some(function (r) { return r.memberId === existing; });
+    if (hasInc) rec.fee = String(data[row - 2][5]);
+  }
+
   var vals = keys.map(function (k) { return rec[k] == null ? '' : String(rec[k]); });
   ensureRows_(sh, row);
   var rg = sh.getRange(row, 1, 1, keys.length);
@@ -296,6 +306,7 @@ function normMobile_(s) {
 }
 
 function deleteRecord_(name, id) {
+  if (name === 'Members') deleteFeeRowsOf_(id);
   var sh = sheet_(name);
   var n = sh.getLastRow() - 1;
   if (n < 1) return { ok: false, error: 'রেকর্ড পাওয়া যায়নি' };
@@ -446,4 +457,94 @@ function migrateV3() {
     rg.setNumberFormat('@');
     rg.setValues(rows);
   }
+}
+
+/* ---------- ধার্য্য বৃদ্ধি ---------- */
+
+function monthKey_(iso) {
+  var p = String(iso || '').split('-');
+  return (parseInt(p[0], 10) || 0) * 12 + (parseInt(p[1], 10) || 1) - 1;
+}
+
+function findRow_(data, key) {
+  for (var i = 0; i < data.length; i++) if (String(data[i][0]) === String(key)) return i + 2;
+  return -1;
+}
+
+// rec = { memberId, date, increase }। নতুন ধার্য্য = চলতি ধার্য্য + বৃদ্ধি; সদস্যের চলতি ধার্য্যও হালনাগাদ হয়।
+function saveFeeChange_(rec) {
+  var mSh = sheet_('Members'), mKeys = SHEETS.Members.keys;
+  var mn = mSh.getLastRow() - 1;
+  var mData = mn > 0 ? mSh.getRange(2, 1, mn, mKeys.length).getValues() : [];
+  var mRow = findRow_(mData, rec.memberId);
+  if (mRow < 0) return { ok: false, error: 'সদস্য পাওয়া যায়নি' };
+  var m = mData[mRow - 2];
+
+  var inc = Number(rec.increase);
+  if (!(inc > 0)) return { ok: false, error: 'বৃদ্ধির পরিমাণ শূন্যের বেশি হতে হবে' };
+  var date = String(rec.date || '');
+  if (!date) return { ok: false, error: 'তারিখ দিন' };
+  var em = monthKey_(date);
+  if (em < monthKey_(str_(m[1]))) return { ok: false, error: 'সদস্য হওয়ার তারিখের আগের তারিখ দেওয়া যাবে না' };
+
+  var fSh = sheet_('FeeChanges'), fKeys = SHEETS.FeeChanges.keys, w = fKeys.length;
+  var fn = fSh.getLastRow() - 1;
+  var fData = fn > 0 ? fSh.getRange(2, 1, fn, w).getValues() : [];
+  var last = -1;
+  fData.forEach(function (r) { if (String(r[2]) === String(rec.memberId)) last = Math.max(last, monthKey_(str_(r[1]))); });
+  if (last >= 0 && em < last) return { ok: false, error: 'আগের বৃদ্ধির তারিখের আগের তারিখ দেওয়া যাবে না' };
+
+  var prev = Number(m[5]) || 0, nw = prev + inc;
+  var row = [String(nextNo_(fData)), date, String(m[0]), String(m[2]), String(m[3]), String(m[6]), String(prev), String(inc), String(nw)];
+  var start = fSh.getLastRow() + 1;
+  ensureRows_(fSh, start);
+  var rg = fSh.getRange(start, 1, 1, w);
+  rg.setNumberFormat('@');
+  rg.setValues([row]);
+
+  var fc = mSh.getRange(mRow, 6);            // সদস্যের চলতি ধার্য্য
+  fc.setNumberFormat('@');
+  fc.setValue(String(nw));
+
+  var out = {}, mem = {};
+  fKeys.forEach(function (k, i) { out[k] = row[i]; });
+  mKeys.forEach(function (k, i) { mem[k] = k === 'fee' ? String(nw) : str_(m[i]); });
+  return { ok: true, record: out, member: mem };
+}
+
+// শুধু সদস্যের সর্বশেষ বৃদ্ধিটি মোছা যায়; চলতি ধার্য্য আগের মানে ফিরে যায়
+function deleteFeeChange_(id) {
+  var fSh = sheet_('FeeChanges'), w = SHEETS.FeeChanges.keys.length;
+  var fn = fSh.getLastRow() - 1;
+  if (fn < 1) return { ok: false, error: 'রেকর্ড পাওয়া যায়নি' };
+  var fData = fSh.getRange(2, 1, fn, w).getValues();
+  var fRow = findRow_(fData, id);
+  if (fRow < 0) return { ok: false, error: 'রেকর্ড পাওয়া যায়নি' };
+  var r = fData[fRow - 2], memberId = String(r[2]);
+  for (var i = 0; i < fData.length; i++) {
+    if (String(fData[i][2]) === memberId && (parseInt(fData[i][0], 10) || 0) > (parseInt(r[0], 10) || 0)) {
+      return { ok: false, error: 'এই সদস্যের পরবর্তী বৃদ্ধি আছে। আগে সর্বশেষটি মুছুন।' };
+    }
+  }
+  var mSh = sheet_('Members'), mKeys = SHEETS.Members.keys;
+  var mn = mSh.getLastRow() - 1;
+  var mData = mn > 0 ? mSh.getRange(2, 1, mn, mKeys.length).getValues() : [];
+  var mRow = findRow_(mData, memberId), mem = null;
+  if (mRow > 0) {
+    var fc = mSh.getRange(mRow, 6);
+    fc.setNumberFormat('@');
+    fc.setValue(String(r[6]));               // পূর্ব ধার্য্য ফিরিয়ে দেওয়া
+    mem = {};
+    mKeys.forEach(function (k, i) { mem[k] = k === 'fee' ? String(r[6]) : str_(mData[mRow - 2][i]); });
+  }
+  fSh.deleteRow(fRow);
+  return { ok: true, member: mem };
+}
+
+function deleteFeeRowsOf_(memberId) {
+  var sh = sheet_('FeeChanges');
+  var n = sh.getLastRow() - 1;
+  if (n < 1) return;
+  var ids = sh.getRange(2, 3, n, 1).getValues();
+  for (var i = ids.length - 1; i >= 0; i--) if (String(ids[i][0]) === String(memberId)) sh.deleteRow(i + 2);
 }

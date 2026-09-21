@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=16">
+<link rel="stylesheet" href="style.css?v=17">
 </head>
 <body>
 
@@ -45,7 +45,8 @@
 
   <!-- সদস্য এন্ট্রি -->
   <section class="page" id="pg-memberEntry">
-    <div class="ptop"><button class="btn tg" id="mTog" aria-expanded="false" onclick="toggleForm('m')"><i data-ic="plus"></i> সদস্য এন্ট্রি</button></div>
+    <div class="ptop start"><button class="btn tg" id="mTog" aria-expanded="false" onclick="toggleForm('m')"><i data-ic="plus"></i> সদস্য এন্ট্রি</button>
+      <button class="btn tg" id="fTog" aria-expanded="false" onclick="toggleForm('f')"><i data-ic="plus"></i> ধার্য্য বৃদ্ধি ফরম</button></div>
     <div class="card fc" id="mFormCard">
       <h3 id="mTitle">নতুন সদস্য এন্ট্রি</h3>
       <input type="hidden" id="mId">
@@ -62,6 +63,29 @@
         <button class="btn" onclick="saveMember()">সংরক্ষণ করুন</button>
         <button class="btn ghost" id="mCancel" onclick="resetMemberForm()" style="display:none">বাতিল</button>
       </div>
+    </div>
+    <div class="card fc" id="fFormCard">
+      <h3>ধার্য্য বৃদ্ধি ফরম</h3>
+      <div class="tools">
+        <input id="fSearch" placeholder="নাম, আইডি বা মোবাইল দিয়ে খুঁজুন" oninput="renderFee()">
+        <input id="fAll" inputmode="decimal" placeholder="সবার জন্য বৃদ্ধির পরিমাণ" style="max-width:230px">
+        <button class="btn ghost sm" onclick="fillAllFee()">সবার ঘরে বসান</button>
+      </div>
+      <div class="tw">
+        <table class="rt fee">
+          <thead><tr><th>নাম (আইডি)</th><th>মোবাইল নং</th><th>ঠিকানা</th><th>পূর্ব ধার্য্য</th><th>বৃদ্ধির পরিমাণ</th><th>নতুন ধার্য্য</th><th>তারিখ</th><th></th></tr></thead>
+          <tbody id="fBody"></tbody>
+        </table>
+      </div>
+      <div class="btns"><button class="btn" onclick="saveFeeAll()">লেখা সবগুলো এন্ট্রি দিন</button></div>
+      <h3 style="margin-top:20px">ধার্য্য বৃদ্ধির তালিকা</h3>
+      <div class="tw">
+        <table class="rt">
+          <thead><tr><th>বৃদ্ধি নং</th><th>তারিখ</th><th>সদস্য আইডি</th><th>নাম</th><th>পূর্ব ধার্য্য</th><th>বৃদ্ধি</th><th>নতুন ধার্য্য</th><th></th></tr></thead>
+          <tbody id="fhBody"></tbody>
+        </table>
+      </div>
+      <p class="hint">বৃদ্ধির মাস থেকে নতুন ধার্য্য অনুযায়ী হিসাব হবে; আগের মাসগুলো আগের ধার্য্য অনুযায়ীই থাকবে। ভুল হলে শুধু সদস্যের সর্বশেষ বৃদ্ধিটি মোছা যায়।</p>
     </div>
     <div class="card">
       <h3>সদস্য তালিকা</h3>
@@ -412,6 +436,6 @@
 <div id="toast" class="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="app.js?v=16"></script>
+<script src="app.js?v=17"></script>
 </body>
 </html>

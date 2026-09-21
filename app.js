@@ -10,7 +10,7 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbxgZOPwcGzB1blmHXEacgRP
 
 const ID_PREFIX = 'ASP';   // সদস্য আইডির শুরু (Code.gs এর ID_PREFIX এর সাথে মিল রাখুন)
 const CACHE_KEY = 'samity_cache_v2';
-const S = { settings: {}, members: [], collections: [], special: [], expenses: [], notices: [] };
+const S = { settings: {}, members: [], collections: [], special: [], expenses: [], notices: [], feeChanges: [] };
 const PROTECTED = ['setup', 'committeeForm', 'noticeForm'];
 let curPage = 'dashboard';
 
@@ -30,8 +30,8 @@ const idNum = v => parseInt(String(v || '').replace(/\D/g, ''), 10) || 0;
 const bySerial = (a, b) => idNum(a.memberId) - idNum(b.memberId);
 const nextMemberId = () => ID_PREFIX + String(S.members.reduce((m, x) => Math.max(m, idNum(x.memberId)), 0) + 1).padStart(4, '0');
 // শীটে id কলাম নেই; মেমোরিতে id = প্রথম কলামের নম্বর/আইডি
-const KEYS = { members: 'memberId', collections: 'receiptNo', special: 'receiptNo', expenses: 'voucherNo', notices: 'noticeNo' };
-const SHEET_KEY = { Members: 'memberId', Collections: 'receiptNo', Special: 'receiptNo', Expenses: 'voucherNo', Notices: 'noticeNo' };
+const KEYS = { members: 'memberId', collections: 'receiptNo', special: 'receiptNo', expenses: 'voucherNo', notices: 'noticeNo', feeChanges: 'incNo' };
+const SHEET_KEY = { Members: 'memberId', Collections: 'receiptNo', Special: 'receiptNo', Expenses: 'voucherNo', Notices: 'noticeNo', FeeChanges: 'incNo' };
 function normalize() { Object.keys(KEYS).forEach(k => (S[k] || []).forEach(x => { x.id = x[KEYS[k]]; })); }
 const byNo = f => (a, b) => (parseInt(a[f]) || 0) - (parseInt(b[f]) || 0);
 const findMember = id => S.members.find(m => m.id === id);
@@ -93,7 +93,8 @@ async function api(payload, quiet) {
     writing = true; document.body.classList.add('saving');
   }
   const isNew = payload.action === 'save' && payload.record && !payload.record.id;
-  if (isNew) payload.record.token = TOK[payload.sheet] || (TOK[payload.sheet] = newToken());
+  const tk = payload.sheet + ':' + ((payload.record && payload.record.memberId) || '');
+  if (isNew) payload.record.token = TOK[tk] || (TOK[tk] = newToken());
   busy(true);
   try {
     const body = Object.assign({ pw: sessionStorage.getItem('pw') || '' }, payload);
@@ -105,7 +106,7 @@ async function api(payload, quiet) {
       return null;
     }
     if (payload.action === 'save' && j.record) j.record.id = j.record[SHEET_KEY[payload.sheet]];
-    if (isNew) delete TOK[payload.sheet];           // সফল হলে পরের এন্ট্রির জন্য নতুন টোকেন
+    if (isNew) delete TOK[tk];           // সফল হলে পরের এন্ট্রির জন্য নতুন টোকেন
     return j;
   } catch (e) {
     if (!quiet) toast('সার্ভারের সাথে সংযোগ হয়নি', true);
@@ -116,7 +117,7 @@ async function api(payload, quiet) {
   }
 }
 
-const DATA_KEYS = ['settings', 'members', 'collections', 'special', 'expenses', 'notices'];
+const DATA_KEYS = ['settings', 'members', 'collections', 'special', 'expenses', 'notices', 'feeChanges'];
 function cacheSave() {
   try {
     const o = {}; DATA_KEYS.forEach(k => o[k] = S[k]);
@@ -176,7 +177,7 @@ function go(id) {
   document.querySelectorAll('[data-pg]').forEach(b => b.classList.toggle('on', b.dataset.pg === id));
   const parent = MENU.find(m => m.ch && m.ch.some(c => c.id === id));
   if (parent) $('mg-' + parent.g).classList.add('open');
-  if (id === 'memberEntry') resetMemberForm();
+  if (id === 'memberEntry') { resetMemberForm(); resetFeeForm(); }
   if (id === 'collection') resetCollForm();
   if (id === 'special') resetSpecialForm();
   if (id === 'expense') resetExpForm();
@@ -213,7 +214,7 @@ function lockNow(silent) {
 /* ---------- সব রেন্ডার ---------- */
 function refreshAll() {
   renderChrome(); renderDashboard();
-  renderMembers(); fillMemberSelect(); renderColl(); renderSpecial(); renderExp();
+  renderMembers(); renderFee(); fillMemberSelect(); renderColl(); renderSpecial(); renderExp();
   renderAbout(); renderCommittee(); renderNotices(); fillReportYears(); renderReport(); renderCash(); renderLedger();
   refreshNos();
 }
@@ -249,7 +250,23 @@ function monthsBetween(joinISO, asOfISO) {
   const a = String(joinISO).split('-').map(Number), b = String(asOfISO).split('-').map(Number);
   return Math.max(0, (b[0] - a[0]) * 12 + (b[1] - a[1]) + 1);
 }
-const calcAssessed = (m, asOf) => num(m.fee) * monthsBetween(m.date, asOf || todayISO());
+// মাসভিত্তিক ধার্য্যের সময়সূচি: সদস্য হওয়ার মাস থেকে প্রথম বৃদ্ধির আগ পর্যন্ত পূর্ব ধার্য্য, তারপর প্রতিটি বৃদ্ধির মাস থেকে নতুন ধার্য্য
+function feeSegs(m) {
+  const js = monthIdx(m.date); if (js === null) return [];
+  const incs = S.feeChanges.filter(x => x.memberId === m.memberId).sort((a, b) => (parseInt(a.incNo) || 0) - (parseInt(b.incNo) || 0));
+  const segs = [{ from: js, fee: incs.length ? num(incs[0].prevFee) : num(m.fee) }];
+  incs.forEach(x => { const e = monthIdx(x.date); segs.push({ from: Math.max(js, e === null ? js : e), fee: num(x.newFee) }); });
+  return segs;
+}
+function assessedTo(m, endIdx) {
+  const segs = feeSegs(m); let total = 0;
+  segs.forEach((s, k) => {
+    const hi = Math.min(k + 1 < segs.length ? segs[k + 1].from - 1 : endIdx, endIdx);
+    if (hi >= s.from) total += (hi - s.from + 1) * s.fee;
+  });
+  return total;
+}
+const calcAssessed = (m, asOf) => assessedTo(m, monthIdx(asOf || todayISO()));
 const paidBy = (id, excludeId) => S.collections.filter(c => c.memberId === id && c.id !== excludeId).reduce((s, c) => s + num(c.paid), 0);
 const dueOf = (m, asOf, excludeId) => calcAssessed(m, asOf) - paidBy(m.id, excludeId);
 
@@ -285,7 +302,7 @@ function docHeader(sm) {
     <div class="tx"><h1>${esc(s.name || 'সংস্থার নাম')}</h1>${line1 ? `<p>${line1}</p>` : ''}${s.address ? `<p>${esc(s.address)}</p>` : ''}${line3 ? `<p>${line3}</p>` : ''}</div>
     ${s.logo ? '<div style="width:64px"></div>' : ''}</div>`;
 }
-const CENTER_HEADS = ['ক্রম', 'রশিদ নং', 'ভাউচার নং', 'সদস্য আইডি', 'নোটিশ নং'];
+const CENTER_HEADS = ['ক্রম', 'রশিদ নং', 'ভাউচার নং', 'সদস্য আইডি', 'নোটিশ নং', 'বৃদ্ধি নং'];
 function centerCols(root) {
   root.querySelectorAll('table').forEach(t => {
     const hr = t.tHead && t.tHead.rows[t.tHead.rows.length - 1]; if (!hr) return;
@@ -365,6 +382,7 @@ function resetMemberForm() {
   $('mSerial').value = nextMemberId();
   $('mDate').value = todayISO();
   ['mName', 'mMobile', 'mJob', 'mFee', 'mAddr'].forEach(i => $(i).value = '');
+  $('mFee').readOnly = false;
   $('mTitle').textContent = 'নতুন সদস্য এন্ট্রি';
   $('mCancel').style.display = 'none'; closeForm('m');
 }
@@ -399,6 +417,7 @@ function editMember(id) {
   $('mId').value = m.id; $('mSerial').value = m.memberId; $('mDate').value = m.date;
   $('mName').value = m.name; $('mMobile').value = m.mobile; $('mJob').value = m.occupation;
   $('mFee').value = m.fee; $('mAddr').value = m.address;
+  $('mFee').readOnly = S.feeChanges.some(x => x.memberId === m.memberId);
   $('mTitle').textContent = 'সদস্য তথ্য সংশোধন';
   $('mCancel').style.display = ''; openForm('m');
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -408,7 +427,7 @@ async function delMember(id) {
   if (S.collections.some(c => c.memberId === id)) { toast('এই সদস্যের চাঁদা আদায়ের রেকর্ড আছে। আগে সেগুলো মুছুন।', true); return; }
   if (!confirm('"' + m.name + '" কে মুছে ফেলবেন?')) return;
   const j = await api({ action: 'delete', sheet: 'Members', id }); if (!j) return;
-  S.members = S.members.filter(x => x.id !== id); cacheSave();
+  S.members = S.members.filter(x => x.id !== id); S.feeChanges = S.feeChanges.filter(x => x.memberId !== id); cacheSave();
   if ($('mId').value === id) resetMemberForm();
   refreshAll(); toast('মুছে ফেলা হয়েছে');
 }
@@ -855,7 +874,7 @@ function reportCalc(type, y, m) {
   S.members.forEach(mm => {
     const js = monthIdx(mm.date); if (js === null) return;
     // মাসিক ধার্য্য × (সদস্য হওয়ার মাস থেকে নির্বাচিত সময় বা আজ পর্যন্ত মাস)
-    const a = Math.max(0, Math.min(pe, now) - js + 1) * num(mm.fee);
+    const a = assessedTo(mm, Math.min(pe, now));
     const p = S.collections.filter(c => c.memberId === mm.memberId && upto(c.date)).reduce((s, c) => s + num(c.paid), 0);
     assessed += a; due += Math.max(0, a - p);
   });
@@ -1202,11 +1221,100 @@ function renderNoticeAdmin() {
     : '<tr><td colspan="4" class="empty">কোনো নোটিশ নেই</td></tr>';
 }
 
+/* =====================================================================
+   ধার্য্য বৃদ্ধি
+   ===================================================================== */
+const FI = {};   // সদস্যভিত্তিক লেখা মান: { inc, date } (রিফ্রেশে হারাবে না)
+let feeAllBusy = false;
+const lastFeeNo = mid => S.feeChanges.filter(x => x.memberId === mid).reduce((m, x) => Math.max(m, parseInt(x.incNo) || 0), 0);
+
+function renderFee() {
+  if (!$('fBody')) return;
+  const q = query('fSearch');
+  const rows = S.members.slice().sort(bySerial).filter(m => !q || has(q, [m.memberId, m.name, m.mobile, m.address]));
+  $('fBody').innerHTML = rows.length ? rows.map(m => {
+    const st = FI[m.id] || {}, inc = st.inc || '', date = st.date || todayISO();
+    return `<tr>
+      <td data-l="নাম (আইডি)"><b>${esc(m.name)}</b> (${esc(m.memberId)})</td>
+      <td data-l="মোবাইল নং">${bn(esc(m.mobile))}</td><td data-l="ঠিকানা">${esc(m.address)}</td>
+      <td data-l="পূর্ব ধার্য্য">${taka(m.fee)}</td>
+      <td data-l="বৃদ্ধির পরিমাণ"><input inputmode="decimal" value="${esc(inc)}" placeholder="০" oninput="onFeeInput('${m.id}','inc',this.value)"></td>
+      <td data-l="নতুন ধার্য্য"><b id="fn-${m.id}">${num(inc) > 0 ? taka(num(m.fee) + num(inc)) : '—'}</b></td>
+      <td data-l="তারিখ"><input type="date" value="${esc(date)}" onchange="onFeeInput('${m.id}','date',this.value)"></td>
+      <td class="act"><button class="btn sm" onclick="saveFee('${m.id}')">এন্ট্রি</button></td></tr>`;
+  }).join('') : '<tr><td colspan="8" class="empty">কোনো সদস্য পাওয়া যায়নি</td></tr>';
+
+  const hist = S.feeChanges.slice().sort(byNo('incNo'));
+  $('fhBody').innerHTML = hist.length ? hist.map(x => {
+    const mm = findMember(x.memberId), latest = (parseInt(x.incNo) || 0) === lastFeeNo(x.memberId);
+    return `<tr><td data-l="বৃদ্ধি নং">${bn(x.incNo)}</td><td data-l="তারিখ">${fdate(x.date)}</td><td data-l="সদস্য আইডি">${esc(x.memberId)}</td>
+      <td data-l="নাম">${esc(mm ? mm.name : x.name)}</td><td data-l="পূর্ব ধার্য্য">${taka(x.prevFee)}</td><td data-l="বৃদ্ধি">${taka(x.increase)}</td><td data-l="নতুন ধার্য্য"><b>${taka(x.newFee)}</b></td>
+      <td class="act">${latest ? `<button class="ib del" title="ডিলেট" onclick="delFee('${x.id}')">${icon('trash', 17)}</button>` : ''}</td></tr>`;
+  }).join('') : '<tr><td colspan="8" class="empty">এখনও কোনো ধার্য্য বৃদ্ধি নেই</td></tr>';
+}
+function onFeeInput(id, field, v) {
+  const st = FI[id] = FI[id] || {};
+  st[field] = v;
+  if (field === 'inc') {
+    const m = findMember(id), el = $('fn-' + id);
+    if (m && el) el.textContent = num(v) > 0 ? taka(num(m.fee) + num(v)) : '—';
+  }
+}
+function fillAllFee() {
+  const v = $('fAll').value;
+  if (num(v) <= 0) { toast('সবার জন্য বৃদ্ধির পরিমাণ লিখুন', true); return; }
+  const q = query('fSearch');
+  S.members.forEach(m => {
+    if (q && !has(q, [m.memberId, m.name, m.mobile, m.address])) return;
+    (FI[m.id] = FI[m.id] || {}).inc = String(num(v));
+  });
+  renderFee();
+}
+async function saveFee(id, quiet) {
+  const m = findMember(id); if (!m) return false;
+  const st = FI[id] || {}, inc = num(st.inc), date = st.date || todayISO();
+  if (inc <= 0) { toast('"' + m.name + '" এর বৃদ্ধির পরিমাণ লিখুন', true); return false; }
+  if (date.slice(0, 7) < String(m.date).slice(0, 7)) { toast('"' + m.name + '": সদস্য হওয়ার তারিখের আগের তারিখ দেওয়া যাবে না', true); return false; }
+  const lastDate = S.feeChanges.filter(x => x.memberId === m.memberId).reduce((a, x) => (x.date > a ? x.date : a), '');
+  if (lastDate && date.slice(0, 7) < lastDate.slice(0, 7)) { toast('"' + m.name + '": আগের বৃদ্ধির তারিখের আগের তারিখ দেওয়া যাবে না', true); return false; }
+  const j = await api({ action: 'save', sheet: 'FeeChanges', record: { memberId: m.memberId, date, increase: String(inc) } });
+  if (!j) return false;
+  upsert(S.feeChanges, j.record);
+  if (j.member) { j.member.id = j.member.memberId; upsert(S.members, j.member); }
+  delete FI[id]; cacheSave(); refreshAll();
+  if (!quiet) toast('ধার্য্য বৃদ্ধি সংরক্ষিত হয়েছে');
+  return true;
+}
+async function saveFeeAll() {
+  if (feeAllBusy) return;
+  const ids = S.members.filter(m => num((FI[m.id] || {}).inc) > 0).map(m => m.id);
+  if (!ids.length) { toast('কোনো সদস্যের বৃদ্ধির পরিমাণ লেখা হয়নি', true); return; }
+  if (!confirm(bn(ids.length) + ' জন সদস্যের ধার্য্য বৃদ্ধি সংরক্ষণ করবেন?')) return;
+  feeAllBusy = true;
+  let ok = 0;
+  try { for (const id of ids) { if (!(await saveFee(id, true))) break; ok++; } }
+  finally { feeAllBusy = false; }
+  toast(bn(ok) + 'টি ধার্য্য বৃদ্ধি সংরক্ষিত হয়েছে', ok !== ids.length);
+}
+async function delFee(id) {
+  if (!confirm('এই ধার্য্য বৃদ্ধি মুছে ফেলবেন? সদস্যের ধার্য্য আগের মানে ফিরে যাবে।')) return;
+  const j = await api({ action: 'delete', sheet: 'FeeChanges', id }); if (!j) return;
+  S.feeChanges = S.feeChanges.filter(x => x.id !== id);
+  if (j.member) { j.member.id = j.member.memberId; upsert(S.members, j.member); }
+  cacheSave(); refreshAll(); toast('মুছে ফেলা হয়েছে');
+}
+function resetFeeForm() {
+  Object.keys(FI).forEach(k => delete FI[k]);
+  if ($('fAll')) $('fAll').value = '';
+  if ($('fSearch')) $('fSearch').value = '';
+  renderFee(); closeForm('f');
+}
+
 /* ---------- ফরম খোলা/বন্ধ (বাটন) ---------- */
-function openForm(p) { $(p + 'FormCard').classList.add('open'); $(p + 'Tog').setAttribute('aria-expanded', 'true'); }
+function openForm(p) { if (p === 'f') closeForm('m'); if (p === 'm') closeForm('f'); $(p + 'FormCard').classList.add('open'); $(p + 'Tog').setAttribute('aria-expanded', 'true'); }
 function closeForm(p) { const c = $(p + 'FormCard'); if (!c) return; c.classList.remove('open'); $(p + 'Tog').setAttribute('aria-expanded', 'false'); }
 function toggleForm(p) {
-  if ($(p + 'FormCard').classList.contains('open')) ({ m: resetMemberForm, c: resetCollForm, s: resetSpecialForm, e: resetExpForm })[p]();
+  if ($(p + 'FormCard').classList.contains('open')) ({ m: resetMemberForm, c: resetCollForm, s: resetSpecialForm, e: resetExpForm, f: resetFeeForm })[p]();
   else openForm(p);
 }
 
