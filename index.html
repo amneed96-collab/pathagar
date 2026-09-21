@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=12">
+<link rel="stylesheet" href="style.css?v=13">
 </head>
 <body>
 
@@ -71,7 +71,7 @@
       </div>
       <div class="tw">
         <table class="rt">
-          <thead><tr><th>ক্রম</th><th>সদস্য আইডি</th><th>তারিখ</th><th>নাম</th><th>মোবাইল</th><th>পেশা</th><th>ধার্য্য</th><th>ঠিকানা</th><th></th></tr></thead>
+          <thead><tr><th>সদস্য আইডি</th><th>তারিখ</th><th>নাম</th><th>মোবাইল</th><th>পেশা</th><th>ধার্য্য</th><th>ঠিকানা</th><th></th></tr></thead>
           <tbody id="mBody"></tbody>
         </table>
       </div>
@@ -87,10 +87,10 @@
       <div class="fg">
         <label>রশিদ নং (অটো)<input id="cReceipt" readonly></label>
         <label>তারিখ<input type="date" id="cDate" onchange="recalcDue()"></label>
-        <label class="full">সদস্য আইডি (সিলেক্ট করুন)
+        <label>সদস্য আইডি<input id="cSerial" readonly></label>
+        <label class="full">সদস্যের নাম
           <select id="cMember" onchange="onMemberPick()"></select>
         </label>
-        <label class="full">নাম<input id="cName" readonly></label>
         <label>মোবাইল নং<input id="cMobile" readonly></label>
         <label class="full">ঠিকানা<input id="cAddr" readonly></label>
         <label>ধার্য্য (মাসিক)<input id="cFee" readonly></label>
@@ -112,7 +112,7 @@
       </div>
       <div class="tw">
         <table class="rt">
-          <thead><tr><th>ক্রম</th><th>রশিদ নং</th><th>তারিখ</th><th>সদস্য আইডি</th><th>নাম</th><th>ধার্য্য</th><th>পূর্ব বকেয়া</th><th>পরিশোধ</th><th></th></tr></thead>
+          <thead><tr><th>রশিদ নং</th><th>তারিখ</th><th>সদস্য আইডি</th><th>নাম</th><th>ধার্য্য</th><th>পূর্ব বকেয়া</th><th>পরিশোধ</th><th></th></tr></thead>
           <tbody id="cBody"></tbody>
         </table>
       </div>
@@ -147,7 +147,7 @@
       </div>
       <div class="tw">
         <table class="rt">
-          <thead><tr><th>ক্রম</th><th>রশিদ নং</th><th>তারিখ</th><th>নাম</th><th>মোবাইল</th><th>বিবরণ</th><th>টাকা</th><th></th></tr></thead>
+          <thead><tr><th>রশিদ নং</th><th>তারিখ</th><th>নাম</th><th>মোবাইল</th><th>বিবরণ</th><th>টাকা</th><th></th></tr></thead>
           <tbody id="sBody"></tbody>
         </table>
       </div>
@@ -187,7 +187,7 @@
       </div>
       <div class="tw">
         <table class="rt">
-          <thead><tr><th>ক্রম</th><th>ভাউচার নং</th><th>তারিখ</th><th>সর্বমোট</th><th></th></tr></thead>
+          <thead><tr><th>ভাউচার নং</th><th>তারিখ</th><th>সর্বমোট</th><th></th></tr></thead>
           <tbody id="eBody"></tbody>
         </table>
       </div>
@@ -295,7 +295,7 @@
       <h3>প্রতিষ্ঠাতাদের নাম ও ঠিকানা</h3>
       <div class="tw">
         <table class="dyn">
-          <thead><tr><th class="c">ক্রম</th><th>নাম</th><th>ঠিকানা</th><th></th></tr></thead>
+          <thead><tr><th>নাম</th><th>ঠিকানা</th><th></th></tr></thead>
           <tbody id="stFounders"></tbody>
         </table>
       </div>
@@ -323,7 +323,7 @@
       </div>
       <div class="tw">
         <table class="dyn">
-          <thead><tr><th class="c">ক্রম</th><th>পদবি</th><th>নাম</th><th>মোবাইল নং</th><th></th></tr></thead>
+          <thead><tr><th>পদবি</th><th>নাম</th><th>মোবাইল নং</th><th></th></tr></thead>
           <tbody id="cfRows"></tbody>
         </table>
       </div>
@@ -356,7 +356,7 @@
       <h3>নোটিশ তালিকা</h3>
       <div class="tw">
         <table class="rt">
-          <thead><tr><th>ক্রম</th><th>নোটিশ নং</th><th>তারিখ</th><th>শিরোনাম</th><th></th></tr></thead>
+          <thead><tr><th>নোটিশ নং</th><th>তারিখ</th><th>শিরোনাম</th><th></th></tr></thead>
           <tbody id="nfBody"></tbody>
         </table>
       </div>
@@ -412,6 +412,6 @@
 <div id="toast" class="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="app.js?v=12"></script>
+<script src="app.js?v=13"></script>
 </body>
 </html>
