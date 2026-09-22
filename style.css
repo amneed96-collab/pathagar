@@ -283,21 +283,21 @@ table.dyn td:last-child{width:44px}
 .sh-list .btn{width:100%}
 .mbox.wide{max-width:420px;max-height:92vh;overflow-y:auto}
 
-/* ক্যাশ রিপোর্ট / লেজার: আয়-ব্যয় পাশাপাশি */
-table.sbs{min-width:680px;table-layout:fixed;width:100%}
-table.sbs td,table.sbs th{overflow-wrap:anywhere}
-table.sbs th.c{text-align:center}
-table.sbs td.r,table.sbs th.r{text-align:right}
-table.sbs td.gap,table.sbs th.gap{width:14px;min-width:14px;padding:0;border:0!important;background:none!important}
-table.sbs tr.grp td{background:var(--navy);color:#fff;font-weight:700}
-table.sbs tr.sub td{background:var(--navy-l);font-weight:600;color:var(--navy)}
-table.sbs tr.sub td.gap{background:none}
-table.sbs tr.tt td{background:var(--navy-l);font-weight:700;color:var(--navy)}
-table.sbs tr.tt td.gap{background:none}
-
-/* নেট সারি: বর্ডার নেই */
-table.sbs tr.net td{border:0!important;background:none!important;text-align:right;font-weight:700}
-#printArea table.sbs{min-width:0}
+/* ক্যাশ রিপোর্ট / লেজার: আয়-ব্যয় পাশাপাশি — CSS Grid (table colspan এর বদলে, ব্রাউজার-নিরপেক্ষ মার্জের জন্য) */
+.sbsg{display:grid;min-width:680px;width:100%}
+.sbsg.cash{grid-template-columns:9% 29% 11% 2% 9% 29% 11%}
+.sbsg.ledger{grid-template-columns:34% 15% 2% 34% 15%}
+.sbsg .gc{padding:9px 10px;border-bottom:1px solid var(--line);overflow-wrap:anywhere;display:flex;align-items:center;min-width:0}
+.sbsg .gc.r{justify-content:flex-end;text-align:right}
+.sbsg .gc.ctr{justify-content:center;text-align:center}
+.sbsg .gc.c{justify-content:center;text-align:center;font-weight:700;background:var(--navy-l);color:var(--navy)}
+.sbsg .gc.gap{border:0;padding:0;min-width:14px}
+.sbsg .gc.hd{font-weight:700;justify-content:flex-start;text-align:left}
+.sbsg .gc.st{font-weight:700;justify-content:flex-end}
+.sbsg .gc.net{grid-column:1/-1;border:0;background:none;font-weight:700;justify-content:flex-end;text-align:right;padding-top:12px}
+#printArea .sbsg,.bw .sbsg{min-width:0}
+.bw .sbsg .gc{border-bottom:1px solid #000!important}
+.bw .sbsg .gc.gap,.bw .sbsg .gc.net{border:0!important}
 
 /* রিপোর্ট প্রিভিউ ও প্রিন্ট: শুধু কালো লেখা, কোনো ব্যাকগ্রাউন্ড বা রঙ নেই */
 .bw,.bw *{color:#000!important;background:none!important;border-color:#000!important;box-shadow:none!important}
@@ -318,7 +318,7 @@ table.sbs tr.net td{border:0!important;background:none!important;text-align:righ
 .card.bw{background:#fff!important}
 
 /* সব টেবিলের হেডার মাঝ বরাবর (স্ক্রিন ও প্রিন্ট) */
-th,#printArea th,#shotArea th,table.rep th:last-child,table.sbs th.r,#printArea th.r{text-align:center!important}
+th,#printArea th,#shotArea th,table.rep th:last-child,#printArea th.r{text-align:center!important}
 
 /* সংরক্ষণ চলাকালীন বাটন নিষ্ক্রিয় */
 body.saving .btns .btn{pointer-events:none;opacity:.6}
@@ -334,6 +334,4 @@ h3.sec small{font-weight:400;color:var(--muted);font-size:14px}
 #stats>.stats:first-child{margin-bottom:0}
 
 /* খাতের হেডার সারি */
-table.sbs td.hd{font-weight:700;text-align:left}
 
-table.sbs td.st{font-weight:700}

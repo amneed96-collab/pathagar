@@ -82,7 +82,7 @@ function getAllJson_() {
   var hit = cache.get('all_' + ver);
   if (hit) return hit;
   var s = JSON.stringify(getAll_());
-  try { if ((cache.get('ver') || '0') === ver) cache.put('all_' + ver, s, 60); } catch (e) { /* ১০০KB এর বেশি হলে ক্যাশ হয় না */ }
+  try { if ((cache.get('ver') || '0') === ver) cache.put('all_' + ver, s, 1500); } catch (e) { /* ১০০KB এর বেশি হলে ক্যাশ হয় না (ডেটা অনেক বড় হলে) */ }
   return s;
 }
 

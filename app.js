@@ -91,7 +91,7 @@ async function fetchJson(url, opts, tries) {
   let lastErr;
   for (let i = 0; i < tries; i++) {
     const ctl = new AbortController();
-    const to = setTimeout(() => ctl.abort(), 30000);
+    const to = setTimeout(() => ctl.abort(), 20000);
     try {
       const r = await fetch(url, Object.assign({ signal: ctl.signal }, opts));
       const j = JSON.parse(await r.text());        // HTML ত্রুটি পাতা এলে এখানে ব্যতিক্রম হয়
@@ -1043,9 +1043,12 @@ function inPeriod(e, s) {
   return true;
 }
 
-const SBS_GAP = '<td class="gap"></td>';
-function netRow(ti, te, cols) {
-  return `<tr class="net"><td colspan="${cols}" class="r">${ti >= te ? 'উদ্বৃত্ত' : 'ঘাটতি'} (আয় − ব্যয়): ${taka(Math.abs(ti - te))}</td></tr>`;
+// আয়-ব্যয়ের পাশাপাশি রিপোর্ট এখন HTML <table><td colspan> দিয়ে নয়, CSS Grid দিয়ে তৈরি হয়।
+// কিছু ব্রাউজারে table-layout:fixed + colspan একসাথে ঠিকভাবে মার্জ না হয়ে সংকুচিত হয়ে যায় —
+// CSS Grid এ grid-column: স্প্যান সব ব্রাউজারে নিখুঁতভাবে কাজ করে, তাই এই সমস্যা আর থাকে না।
+function gc(col, span, cls, text) {
+  const gcol = span > 1 ? `${col} / span ${span}` : col;
+  return `<div class="gc${cls ? ' ' + cls : ''}" style="grid-column:${gcol}">${text == null ? '' : text}</div>`;
 }
 const HEAD_FIRST = 'সদস্য চাঁদা';
 // খাত অনুযায়ী ভাগ: "সদস্য চাঁদা" আগে, বাকিগুলো প্রথম আসার ক্রমে
@@ -1055,11 +1058,11 @@ function groupByHead(list) {
   order.sort((a, b) => (a === HEAD_FIRST ? 0 : 1) - (b === HEAD_FIRST ? 0 : 1));
   return order.map(h => ({ head: h, items: mp[h] }));
 }
-function cashCells(L) {
-  if (!L || L.t === 'blank') return '<td></td><td></td><td></td>';
-  if (L.t === 'head') return `<td colspan="3" class="hd" style="width:49%">${esc(L.text)}</td>`;
-  if (L.t === 'sub') return `<td colspan="2" class="r st" style="width:38%">${esc(L.text)}</td><td class="r st">${amt(L.v)}</td>`;
-  return `<td>${L.x.no}</td><td>${esc(L.x.desc)}</td><td class="r">${amt(L.x.amt)}</td>`;
+function cashCells(L, c1, c2, c3) {
+  if (!L || L.t === 'blank') return gc(c1, 3, '', '');
+  if (L.t === 'head') return gc(c1, 3, 'hd', esc(L.text));
+  if (L.t === 'sub') return gc(c1, 2, 'r st', esc(L.text)) + gc(c3, 1, 'r st', amt(L.v));
+  return gc(c1, 1, 'ctr', L.x.no) + gc(c2, 1, '', esc(L.x.desc)) + gc(c3, 1, 'r', amt(L.x.amt));
 }
 function cashHtml(s) {
   const e = rpEntries();
@@ -1083,9 +1086,9 @@ function cashHtml(s) {
   while (left.length < n) left.push({ t: 'blank' });
   while (right.length < n) right.push({ t: 'blank' });
   let r = '';
-  for (let i = 0; i < n; i++) r += `<tr>${cashCells(left[i])}${SBS_GAP}${cashCells(right[i])}</tr>`;
+  for (let i = 0; i < n; i++) r += cashCells(left[i], 1, 2, 3) + gc(4, 1, 'gap', '') + cashCells(right[i], 5, 6, 7);
 
-  // নিচের যোগফল অংশ: দুই দিকের সারি একই লাইনে
+  // নিচের যোগফল অংশ
   const ti = sum(inc, 'amt'), te = sum(exp, 'amt');
   const TI = ti + Math.max(prevNet, 0), TE = te + Math.max(-prevNet, 0);
   const per = s.type === 'month' ? 'গত মাসের' : 'গত বছরের';
@@ -1094,13 +1097,14 @@ function cashHtml(s) {
   if (prevNet > 0) pairs.push([{ t: 'sub', text: per + ' উদ্বৃত্ত', v: prevNet }, null]);
   if (prevNet < 0) pairs.push([null, { t: 'sub', text: per + ' ঘাটতি', v: -prevNet }]);
   pairs.push([{ t: 'sub', text: 'সর্বমোট আয়', v: TI }, { t: 'sub', text: 'সর্বমোট ব্যয়', v: TE }]);
-  pairs.forEach(pr => { r += `<tr class="tt">${cashCells(pr[0])}${SBS_GAP}${cashCells(pr[1])}</tr>`; });
+  pairs.forEach(pr => { r += cashCells(pr[0], 1, 2, 3) + gc(4, 1, 'gap', '') + cashCells(pr[1], 5, 6, 7); });
 
-  return `<table class="sbs"><colgroup><col style="width:9%"><col style="width:29%"><col style="width:11%"><col style="width:2%"><col style="width:9%"><col style="width:29%"><col style="width:11%"></colgroup><thead>
-    <tr><th colspan="3" class="c">আয়</th><th class="gap"></th><th colspan="3" class="c">ব্যয়</th></tr>
-    <tr><th>রশিদ নং</th><th>বিবরণ</th><th class="r">টাকা</th><th class="gap"></th><th>ভাউচার নং</th><th>বিবরণ</th><th class="r">টাকা</th></tr></thead>
-    <tbody>${r}
-    <tr class="net"><td colspan="7" class="r">বর্তমান ${TI >= TE ? 'উদ্বৃত্ত' : 'ঘাটতি'}: ${taka(Math.abs(TI - TE))}</td></tr></tbody></table>`;
+  r += gc(1, 7, 'net', `বর্তমান ${TI >= TE ? 'উদ্বৃত্ত' : 'ঘাটতি'}: ${taka(Math.abs(TI - TE))}`);
+
+  return `<div class="sbsg cash">
+    ${gc(1, 3, 'c', 'আয়')}${gc(4, 1, 'gap', '')}${gc(5, 3, 'c', 'ব্যয়')}
+    ${gc(1, 1, 'ctr', 'রশিদ নং')}${gc(2, 1, '', 'বিবরণ')}${gc(3, 1, 'r', 'টাকা')}${gc(4, 1, 'gap', '')}${gc(5, 1, 'ctr', 'ভাউচার নং')}${gc(6, 1, '', 'বিবরণ')}${gc(7, 1, 'r', 'টাকা')}
+    ${r}</div>`;
 }
 function renderCash() {
   if (!$('crOut')) return;
@@ -1132,23 +1136,25 @@ function ledgerSide(list, s) {
   });
   return lines;
 }
+function ledgerCell(x, c1, c2) {
+  if (!x || x.t === 'blank') return gc(c1, 2, '', '');
+  if (x.t === 'head') return gc(c1, 2, 'hd', esc(x.a));
+  return gc(c1, 1, '', esc(x.a)) + gc(c2, 1, 'r', amt(x.b));
+}
 function ledgerHtml(s) {
   const e = rpEntries(), inc = e.inc.filter(x => inPeriod(x, s)), exp = e.exp.filter(x => inPeriod(x, s));
   if (!inc.length && !exp.length) return '<div class="empty">এই সময়ে কোনো লেনদেন নেই</div>';
   const L = ledgerSide(inc, s), R = ledgerSide(exp, s);
-  const cell = x => !x || x.t === 'blank' ? '<td></td><td></td>'
-    : x.t === 'head' ? `<td colspan="2" class="hd" style="width:49%">${esc(x.a)}</td>`
-    : `<td>${esc(x.a)}</td><td class="r">${amt(x.b)}</td>`;
   let r = '';
-  for (let i = 0, n = Math.max(L.length, R.length); i < n; i++) r += `<tr>${cell(L[i])}${SBS_GAP}${cell(R[i])}</tr>`;
+  for (let i = 0, n = Math.max(L.length, R.length); i < n; i++) r += ledgerCell(L[i], 1, 2) + gc(3, 1, 'gap', '') + ledgerCell(R[i], 4, 5);
   const ti = sum(inc, 'amt'), te = sum(exp, 'amt');
   const col = { month: 'খাত', year: 'খাত / মাস', all: 'খাত / বছর' }[s.type];
-  return `<table class="sbs"><colgroup><col style="width:34%"><col style="width:15%"><col style="width:2%"><col style="width:34%"><col style="width:15%"></colgroup><thead>
-    <tr><th colspan="2" class="c">আয়</th><th class="gap"></th><th colspan="2" class="c">ব্যয়</th></tr>
-    <tr><th>${col}</th><th class="r">টাকা</th><th class="gap"></th><th>${col}</th><th class="r">টাকা</th></tr></thead>
-    <tbody>${r}
-    <tr class="tt"><td class="r">সর্বমোট আয়</td><td class="r">${amt(ti)}</td>${SBS_GAP}<td class="r">সর্বমোট ব্যয়</td><td class="r">${amt(te)}</td></tr>
-    <tr class="net"><td colspan="5" class="r">বর্তমান ${ti >= te ? 'উদ্বৃত্ত' : 'ঘাটতি'}: ${taka(Math.abs(ti - te))}</td></tr></tbody></table>`;
+  r += gc(1, 1, 'r st', 'সর্বমোট আয়') + gc(2, 1, 'r st', amt(ti)) + gc(3, 1, 'gap', '') + gc(4, 1, 'r st', 'সর্বমোট ব্যয়') + gc(5, 1, 'r st', amt(te));
+  r += gc(1, 5, 'net', `বর্তমান ${ti >= te ? 'উদ্বৃত্ত' : 'ঘাটতি'}: ${taka(Math.abs(ti - te))}`);
+  return `<div class="sbsg ledger">
+    ${gc(1, 2, 'c', 'আয়')}${gc(3, 1, 'gap', '')}${gc(4, 2, 'c', 'ব্যয়')}
+    ${gc(1, 1, '', col)}${gc(2, 1, 'r', 'টাকা')}${gc(3, 1, 'gap', '')}${gc(4, 1, '', col)}${gc(5, 1, 'r', 'টাকা')}
+    ${r}</div>`;
 }
 function renderLedger() {
   if (!$('lgOut')) return;
