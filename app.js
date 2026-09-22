@@ -1057,8 +1057,8 @@ function groupByHead(list) {
 }
 function cashCells(L) {
   if (!L || L.t === 'blank') return '<td></td><td></td><td></td>';
-  if (L.t === 'head') return `<td colspan="3" class="hd">${esc(L.text)}</td>`;
-  if (L.t === 'sub') return `<td colspan="2" class="r st">${esc(L.text)}</td><td class="r st">${amt(L.v)}</td>`;
+  if (L.t === 'head') return `<td colspan="3" class="hd" style="width:49%">${esc(L.text)}</td>`;
+  if (L.t === 'sub') return `<td colspan="2" class="r st" style="width:38%">${esc(L.text)}</td><td class="r st">${amt(L.v)}</td>`;
   return `<td>${L.x.no}</td><td>${esc(L.x.desc)}</td><td class="r">${amt(L.x.amt)}</td>`;
 }
 function cashHtml(s) {
@@ -1137,7 +1137,7 @@ function ledgerHtml(s) {
   if (!inc.length && !exp.length) return '<div class="empty">এই সময়ে কোনো লেনদেন নেই</div>';
   const L = ledgerSide(inc, s), R = ledgerSide(exp, s);
   const cell = x => !x || x.t === 'blank' ? '<td></td><td></td>'
-    : x.t === 'head' ? `<td colspan="2" class="hd">${esc(x.a)}</td>`
+    : x.t === 'head' ? `<td colspan="2" class="hd" style="width:49%">${esc(x.a)}</td>`
     : `<td>${esc(x.a)}</td><td class="r">${amt(x.b)}</td>`;
   let r = '';
   for (let i = 0, n = Math.max(L.length, R.length); i < n; i++) r += `<tr>${cell(L[i])}${SBS_GAP}${cell(R[i])}</tr>`;
