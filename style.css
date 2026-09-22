@@ -287,16 +287,17 @@ table.dyn td:last-child{width:44px}
 .sbsg{display:grid;min-width:680px;width:100%}
 .sbsg.cash{grid-template-columns:9% 29% 11% 2% 9% 29% 11%}
 .sbsg.ledger{grid-template-columns:34% 15% 2% 34% 15%}
-.sbsg .gc{padding:9px 10px;border-bottom:1px solid var(--line);overflow-wrap:anywhere;display:flex;align-items:center;min-width:0}
+.sbsg .gc{padding:9px 10px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);overflow-wrap:anywhere;display:flex;align-items:center;min-width:0}
 .sbsg .gc.r{justify-content:flex-end;text-align:right}
 .sbsg .gc.ctr{justify-content:center;text-align:center}
 .sbsg .gc.c{justify-content:center;text-align:center;font-weight:700;background:var(--navy-l);color:var(--navy)}
-.sbsg .gc.gap{border:0;padding:0;min-width:14px}
+.sbsg .gc.gap{border:0!important;padding:0;min-width:14px}
 .sbsg .gc.hd{font-weight:700;justify-content:flex-start;text-align:left}
+.sbsg .gc.hdc{font-weight:700;justify-content:center;text-align:center}
 .sbsg .gc.st{font-weight:700;justify-content:flex-end}
-.sbsg .gc.net{grid-column:1/-1;border:0;background:none;font-weight:700;justify-content:flex-end;text-align:right;padding-top:12px}
+.sbsg .gc.net{grid-column:1/-1;border:0!important;background:none;font-weight:700;justify-content:flex-end;text-align:right;padding-top:12px}
 #printArea .sbsg,.bw .sbsg{min-width:0}
-.bw .sbsg .gc{border-bottom:1px solid #000!important}
+.bw .sbsg .gc{border:1px solid #000!important}
 .bw .sbsg .gc.gap,.bw .sbsg .gc.net{border:0!important}
 
 /* রিপোর্ট প্রিভিউ ও প্রিন্ট: শুধু কালো লেখা, কোনো ব্যাকগ্রাউন্ড বা রঙ নেই */

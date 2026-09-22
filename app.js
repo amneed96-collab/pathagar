@@ -1060,7 +1060,7 @@ function groupByHead(list) {
 }
 function cashCells(L, c1, c2, c3) {
   if (!L || L.t === 'blank') return gc(c1, 3, '', '');
-  if (L.t === 'head') return gc(c1, 3, 'hd', esc(L.text));
+  if (L.t === 'head') return gc(c1, 3, 'hdc', esc(L.text));
   if (L.t === 'sub') return gc(c1, 2, 'r st', esc(L.text)) + gc(c3, 1, 'r st', amt(L.v));
   return gc(c1, 1, 'ctr', L.x.no) + gc(c2, 1, '', esc(L.x.desc)) + gc(c3, 1, 'r', amt(L.x.amt));
 }
