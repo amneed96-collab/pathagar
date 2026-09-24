@@ -1103,7 +1103,7 @@ function cashHtml(s) {
 
   return `<div class="sbsg cash">
     ${gc(1, 3, 'c', 'আয়')}${gc(4, 1, 'gap', '')}${gc(5, 3, 'c', 'ব্যয়')}
-    ${gc(1, 1, 'ctr', 'রশিদ নং')}${gc(2, 1, '', 'বিবরণ')}${gc(3, 1, 'r', 'টাকা')}${gc(4, 1, 'gap', '')}${gc(5, 1, 'ctr', 'ভাউচার নং')}${gc(6, 1, '', 'বিবরণ')}${gc(7, 1, 'r', 'টাকা')}
+    ${gc(1, 1, 'c', 'রশিদ নং')}${gc(2, 1, 'c', 'বিবরণ')}${gc(3, 1, 'c', 'টাকা')}${gc(4, 1, 'gap', '')}${gc(5, 1, 'c', 'ভাউচার নং')}${gc(6, 1, 'c', 'বিবরণ')}${gc(7, 1, 'c', 'টাকা')}
     ${r}</div>`;
 }
 function renderCash() {
@@ -1113,26 +1113,28 @@ function renderCash() {
   $('crOut').innerHTML = cashHtml(s);
 }
 
-// লেজার: মাসিক = খাত ও মোট; বাৎসরিক = খাত, তার নিচে মাসভিত্তিক মোট; সর্বমোট = খাত, তার নিচে বছরভিত্তিক মোট
+// লেজার: মাসিক = খাত ও মোট (সরল তালিকা); বাৎসরিক = প্রতি মাসের (বোল্ড) নামের নিচে সেই মাসের খাতগুলো;
+// সর্বমোট = প্রতি বছরের (বোল্ড) নামের নিচে সেই বছরের খাতগুলো। খাতে-খাতে ফাঁকা রো নেই, শুধু একে সময়কাল শেষে পরেরটির আগে একটি ফাঁকা রো।
 function ledgerSide(list, s) {
-  const byTot = (heads, tot) => Object.keys(heads).sort((a, b) => (a === HEAD_FIRST ? 0 : 1) - (b === HEAD_FIRST ? 0 : 1) || tot(b) - tot(a));
+  const byTot = arr => arr.sort((a, b) => (a[0] === HEAD_FIRST ? 0 : 1) - (b[0] === HEAD_FIRST ? 0 : 1) || b[1] - a[1]);
   if (s.type === 'month') {
     const mp = {};
     list.forEach(x => { mp[x.head] = (mp[x.head] || 0) + x.amt; });
-    return byTot(mp, h => mp[h]).map(h => ({ t: 'row', a: h, b: mp[h] }));
+    return byTot(Object.entries(mp)).map(([h, v]) => ({ t: 'row', a: h, b: v }));
   }
   const keyOf = s.type === 'year' ? x => monthIdx(x.d) : x => Math.floor(monthIdx(x.d) / 12);
   const label = k => s.type === 'year' ? MONTHS[k % 12] : bn(k) + ' সাল';
-  const heads = {};
+  const periods = {};   // পর্ব (মাস/বছর) -> { খাত: টাকা }
   list.forEach(x => {
-    const h = heads[x.head] = heads[x.head] || { tot: 0, per: {} }, k = keyOf(x);
-    h.tot += x.amt; h.per[k] = (h.per[k] || 0) + x.amt;
+    const k = keyOf(x), p = periods[k] = periods[k] || {};
+    p[x.head] = (p[x.head] || 0) + x.amt;
   });
+  const keys = Object.keys(periods).map(Number).sort((a, b) => a - b);   // কালানুক্রমিক (আগেরটি আগে)
   const lines = [];
-  byTot(heads, h => heads[h].tot).forEach((h, i) => {
+  keys.forEach((k, i) => {
     if (i) lines.push({ t: 'blank' });
-    lines.push({ t: 'head', a: h });
-    Object.keys(heads[h].per).map(Number).sort((a, b) => a - b).forEach(k => lines.push({ t: 'row', a: label(k), b: heads[h].per[k] }));
+    lines.push({ t: 'head', a: label(k) });
+    byTot(Object.entries(periods[k])).forEach(([h, v]) => lines.push({ t: 'row', a: h, b: v }));
   });
   return lines;
 }
@@ -1153,7 +1155,7 @@ function ledgerHtml(s) {
   r += gc(1, 5, 'net', `বর্তমান ${ti >= te ? 'উদ্বৃত্ত' : 'ঘাটতি'}: ${taka(Math.abs(ti - te))}`);
   return `<div class="sbsg ledger">
     ${gc(1, 2, 'c', 'আয়')}${gc(3, 1, 'gap', '')}${gc(4, 2, 'c', 'ব্যয়')}
-    ${gc(1, 1, '', col)}${gc(2, 1, 'r', 'টাকা')}${gc(3, 1, 'gap', '')}${gc(4, 1, '', col)}${gc(5, 1, 'r', 'টাকা')}
+    ${gc(1, 1, 'c', col)}${gc(2, 1, 'c', 'টাকা')}${gc(3, 1, 'gap', '')}${gc(4, 1, 'c', col)}${gc(5, 1, 'c', 'টাকা')}
     ${r}</div>`;
 }
 function renderLedger() {
