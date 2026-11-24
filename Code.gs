@@ -26,8 +26,8 @@ var SHEETS = {
     labels: ['সদস্য আইডি', 'তারিখ', 'নাম', 'মোবাইল নং', 'পেশা', 'ধার্য্য', 'ঠিকানা']
   },
   Collections: {
-    keys:   ['receiptNo', 'date', 'memberId', 'name', 'mobile', 'address', 'fee', 'dueBefore', 'paid', 'months'],
-    labels: ['রশিদ নং', 'তারিখ', 'সদস্য আইডি', 'নাম', 'মোবাইল নং', 'ঠিকানা', 'ধার্য্য', 'বকেয়া', 'পরিশোধ', 'মাস']
+    keys:   ['receiptNo', 'date', 'memberId', 'name', 'mobile', 'address', 'fee', 'dueBefore', 'paid', 'months', 'advance'],
+    labels: ['রশিদ নং', 'তারিখ', 'সদস্য আইডি', 'নাম', 'মোবাইল নং', 'ঠিকানা', 'ধার্য্য', 'বকেয়া', 'পরিশোধ', 'মাস', 'অগ্রিম']
   },
   Special: {
     keys:   ['receiptNo', 'date', 'name', 'mobile', 'address', 'description', 'amount'],

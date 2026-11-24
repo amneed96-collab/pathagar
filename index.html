@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=28">
+<link rel="stylesheet" href="style.css?v=30">
 </head>
 <body>
 
@@ -126,7 +126,8 @@
         <label>বকেয়া (আজ পর্যন্ত)<input id="cDue" readonly class="hl"></label>
         <label>পরিশোধ<input id="cPaid" inputmode="decimal" oninput="updateRemain()"></label>
         <label class="s2">মাস<input id="cMonths" autocomplete="off" placeholder="যেমন: জানুয়ারি, ফেব্রুয়ারি ২০২৬"></label>
-        <label>পরিশোধের পর অবশিষ্ট<input id="cRemain" readonly></label>
+        <label>পরিশোধের পর বকেয়া<input id="cRemain" readonly></label>
+        <label>অগ্রিম<input id="cAdvance" readonly></label>
       </div>
       <div class="btns">
         <button class="btn" onclick="saveColl()">সংরক্ষণ করুন</button>
@@ -475,6 +476,6 @@
 <div id="toast" class="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="app.js?v=28"></script>
+<script src="app.js?v=30"></script>
 </body>
 </html>
