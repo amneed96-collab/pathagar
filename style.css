@@ -231,6 +231,7 @@ table.dyn td:last-child{width:44px}
 @media (min-width:701px){
   .hd h1{font-size:24px}
   .fg{grid-template-columns:repeat(3,1fr)}
+  .fg .s2{grid-column:span 2}
   .stats{grid-template-columns:repeat(3,1fr)}
   .ft-in{grid-template-columns:1fr 1fr}
   .ft-r{justify-content:flex-end}

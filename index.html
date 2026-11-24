@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=27">
+<link rel="stylesheet" href="style.css?v=28">
 </head>
 <body>
 
@@ -111,15 +111,21 @@
       <div class="fg">
         <label>রশিদ নং (অটো)<input id="cReceipt" readonly></label>
         <label>তারিখ<input type="date" id="cDate" onchange="recalcDue()"></label>
-        <label>সদস্য আইডি<input id="cSerial" readonly></label>
-        <label class="full">সদস্যের নাম
-          <select id="cMember" onchange="onMemberPick()"></select>
+        <label>সদস্য আইডি
+          <input id="cSerial" list="cSerialList" autocomplete="off" placeholder="আইডি লিখুন বা বেছে নিন" oninput="onSerialInput()">
+          <datalist id="cSerialList"></datalist>
         </label>
+        <label>সদস্যের নাম
+          <input id="cName" list="cNameList" autocomplete="off" placeholder="নাম লিখুন বা বেছে নিন" oninput="onNameInput()">
+          <datalist id="cNameList"></datalist>
+        </label>
+        <input type="hidden" id="cMember">
         <label>মোবাইল নং<input id="cMobile" readonly></label>
-        <label class="full">ঠিকানা<input id="cAddr" readonly></label>
+        <label>ঠিকানা<input id="cAddr" readonly></label>
         <label>ধার্য্য (মাসিক)<input id="cFee" readonly></label>
         <label>বকেয়া (আজ পর্যন্ত)<input id="cDue" readonly class="hl"></label>
         <label>পরিশোধ<input id="cPaid" inputmode="decimal" oninput="updateRemain()"></label>
+        <label class="s2">মাস<input id="cMonths" autocomplete="off" placeholder="যেমন: জানুয়ারি, ফেব্রুয়ারি ২০২৬"></label>
         <label>পরিশোধের পর অবশিষ্ট<input id="cRemain" readonly></label>
       </div>
       <div class="btns">
@@ -136,7 +142,7 @@
       </div>
       <div class="tw">
         <table class="rt">
-          <thead><tr><th>রশিদ নং</th><th>তারিখ</th><th>সদস্য আইডি</th><th>নাম</th><th>ধার্য্য</th><th>পূর্ব বকেয়া</th><th>পরিশোধ</th><th></th></tr></thead>
+          <thead><tr><th>রশিদ নং</th><th>তারিখ</th><th>সদস্য আইডি</th><th>নাম</th><th>ধার্য্য</th><th>পূর্ব বকেয়া</th><th>পরিশোধ</th><th>মাস</th><th></th></tr></thead>
           <tbody id="cBody"></tbody>
         </table>
       </div>
@@ -469,6 +475,6 @@
 <div id="toast" class="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="app.js?v=27"></script>
+<script src="app.js?v=28"></script>
 </body>
 </html>

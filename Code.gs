@@ -26,8 +26,8 @@ var SHEETS = {
     labels: ['সদস্য আইডি', 'তারিখ', 'নাম', 'মোবাইল নং', 'পেশা', 'ধার্য্য', 'ঠিকানা']
   },
   Collections: {
-    keys:   ['receiptNo', 'date', 'memberId', 'name', 'mobile', 'address', 'fee', 'dueBefore', 'paid'],
-    labels: ['রশিদ নং', 'তারিখ', 'সদস্য আইডি', 'নাম', 'মোবাইল নং', 'ঠিকানা', 'ধার্য্য', 'বকেয়া', 'পরিশোধ']
+    keys:   ['receiptNo', 'date', 'memberId', 'name', 'mobile', 'address', 'fee', 'dueBefore', 'paid', 'months'],
+    labels: ['রশিদ নং', 'তারিখ', 'সদস্য আইডি', 'নাম', 'মোবাইল নং', 'ঠিকানা', 'ধার্য্য', 'বকেয়া', 'পরিশোধ', 'মাস']
   },
   Special: {
     keys:   ['receiptNo', 'date', 'name', 'mobile', 'address', 'description', 'amount'],
@@ -180,6 +180,7 @@ function ss_() { return _ss || (_ss = SpreadsheetApp.getActiveSpreadsheet()); }
 
 function formatSheet_(sh, name) {
   var def = SHEETS[name], n = def.keys.length;
+  if (sh.getMaxColumns() < n) sh.insertColumnsAfter(sh.getMaxColumns(), n - sh.getMaxColumns()); // নতুন কলাম যোগ হলে
   if (sh.getMaxColumns() > n) sh.deleteColumns(n + 1, sh.getMaxColumns() - n); // অতিরিক্ত ফাঁকা কলাম বাদ
   sh.getRange(1, 1, sh.getMaxRows(), n).setNumberFormat('@');                   // সব ঘর টেক্সট
   sh.getRange(1, 1, 1, n).setValues([def.labels])
@@ -195,6 +196,8 @@ function sheet_(name) {
     sh = ss.insertSheet(name);
     formatSheet_(sh, name);
     if (name === 'Settings') sh.getRange(2, 1, 1, 2).setValues([['password', DEFAULT_PASSWORD]]);
+  } else if (sh.getMaxColumns() < SHEETS[name].keys.length) {
+    formatSheet_(sh, name);                    // পুরনো শীটে নতুন কলাম (যেমন 'মাস') নিজে থেকেই যোগ হবে
   }
   _sh[name] = sh;
   return sh;

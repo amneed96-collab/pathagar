@@ -512,26 +512,50 @@ function printMembers() {
    সদস্য চাঁদা আদায়
    ===================================================================== */
 function fillMemberSelect() {
-  const sel = $('cMember'), cur = sel.value;
-  sel.innerHTML = '<option value="">— সদস্য নির্বাচন করুন —</option>' +
-    S.members.slice().sort(bySerial).map(m => `<option value="${m.id}">${esc(m.name)} (${esc(m.memberId)})</option>`).join('');
-  sel.value = cur;
+  const list = S.members.slice().sort(bySerial);
+  $('cSerialList').innerHTML = list.map(m => `<option value="${esc(m.memberId)}" label="${esc(m.name)}"></option>`).join('');
+  $('cNameList').innerHTML = list.map(m => `<option value="${esc(m.name)} (${esc(m.memberId)})"></option>`).join('');
 }
+const COLL_DEP = ['cMobile', 'cAddr', 'cFee', 'cDue', 'cRemain'];
 function resetCollForm() {
   $('cId').value = '';
   $('cReceipt').value = bn(nextNo(S.collections, 'receiptNo'));
   $('cDate').value = todayISO();
   fillMemberSelect(); $('cMember').value = '';
-  ['cSerial', 'cMobile', 'cAddr', 'cFee', 'cDue', 'cPaid', 'cRemain'].forEach(i => $(i).value = '');
+  ['cSerial', 'cName', 'cMobile', 'cAddr', 'cFee', 'cDue', 'cPaid', 'cMonths', 'cRemain'].forEach(i => $(i).value = '');
   $('cTitle').textContent = 'নতুন চাঁদা আদায়';
   $('cCancel').style.display = 'none'; closeForm('c');
 }
-function onMemberPick() {
-  const m = findMember($('cMember').value);
-  if (!m) { ['cSerial', 'cMobile', 'cAddr', 'cFee', 'cDue', 'cRemain'].forEach(i => $(i).value = ''); return; }
-  $('cSerial').value = m.memberId; $('cMobile').value = bn(m.mobile); $('cAddr').value = m.address;
+// আইডি লিখলে/বাছলে সদস্য খুঁজে নামসহ সব ঘর পূরণ
+function onSerialInput() {
+  const v = en($('cSerial').value || '').trim().toLowerCase();
+  const m = v && S.members.find(x => String(x.memberId).toLowerCase() === v);
+  if (m) { $('cMember').value = m.id; $('cName').value = m.name; fillMemberInfo(m); }
+  else { $('cMember').value = ''; $('cName').value = ''; clearMemberInfo(); }
+}
+// নাম লিখলে/বাছলে ("নাম (আইডি)" অথবা হুবহু একক নাম) সদস্য খুঁজে আইডিসহ সব ঘর পূরণ
+function onNameInput() {
+  const raw = $('cName').value.trim();
+  let m = null;
+  const mt = raw.match(/\(([^()]+)\)\s*$/);
+  if (mt) m = S.members.find(x => String(x.memberId).toLowerCase() === mt[1].trim().toLowerCase());
+  if (!m && raw) {
+    const hit = S.members.filter(x => normName(x.name) === normName(raw));
+    if (hit.length === 1) m = hit[0];
+  }
+  if (m) { $('cMember').value = m.id; $('cName').value = m.name; $('cSerial').value = m.memberId; fillMemberInfo(m); }
+  else { $('cMember').value = ''; $('cSerial').value = ''; clearMemberInfo(); }
+}
+function clearMemberInfo() { COLL_DEP.forEach(i => $(i).value = ''); }
+function fillMemberInfo(m) {
+  $('cMobile').value = bn(m.mobile); $('cAddr').value = m.address;
   $('cFee').value = bn(num(m.fee));
   recalcDue();
+}
+function onMemberPick() {
+  const m = findMember($('cMember').value);
+  if (!m) { $('cSerial').value = ''; $('cName').value = ''; clearMemberInfo(); return; }
+  $('cSerial').value = m.memberId; $('cName').value = m.name; fillMemberInfo(m);
 }
 function recalcDue() {
   const m = findMember($('cMember').value); if (!m) return;
@@ -546,12 +570,13 @@ async function saveColl() {
   const m = findMember($('cMember').value);
   const paid = num($('cPaid').value);
   if (!$('cDate').value) { toast('তারিখ দিন', true); return; }
-  if (!m) { toast('সদস্য নির্বাচন করুন', true); return; }
+  if (!m) { toast('তালিকা থেকে সঠিক সদস্য আইডি/নাম নির্বাচন করুন', true); return; }
   if (paid <= 0) { toast('পরিশোধের পরিমাণ লিখুন', true); return; }
   const rec = {
     id: $('cId').value, date: $('cDate').value, memberId: m.memberId, name: m.name,
     mobile: m.mobile, address: m.address, fee: m.fee,
-    dueBefore: String(num($('cDue').value)), paid: String(paid)
+    dueBefore: String(num($('cDue').value)), paid: String(paid),
+    months: $('cMonths').value.trim()
   };
   const j = await api({ action: 'save', sheet: 'Collections', record: rec }); if (!j) return;
   upsert(S.collections, j.record); cacheSave();
@@ -564,7 +589,7 @@ function editColl(id) {
   fillMemberSelect(); $('cMember').value = c.memberId;
   if (!findMember(c.memberId)) { toast('এই সদস্য আর তালিকায় নেই', true); return; }
   onMemberPick();
-  $('cPaid').value = num(c.paid); updateRemain();
+  $('cPaid').value = num(c.paid); $('cMonths').value = c.months || ''; updateRemain();
   $('cTitle').textContent = 'চাঁদা আদায় সংশোধন';
   $('cCancel').style.display = ''; openForm('c');
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -579,12 +604,12 @@ async function delColl(id) {
 const collName = c => { const m = findMember(c.memberId); return m ? m.name : c.name; };
 function renderColl() {
   const q = query('cSearch');
-  const rows = S.collections.slice().sort(byNo('receiptNo')).filter(c => !q || has(q, [c.receiptNo, collName(c), c.memberId, c.mobile]));
+  const rows = S.collections.slice().sort(byNo('receiptNo')).filter(c => !q || has(q, [c.receiptNo, collName(c), c.memberId, c.mobile, c.months]));
   $('cBody').innerHTML = rows.length ? rows.map(c => `<tr>
     <td data-l="রশিদ নং">${bn(c.receiptNo)}</td><td data-l="তারিখ">${fdate(c.date)}</td><td data-l="সদস্য আইডি">${esc(c.memberId)}</td><td data-l="নাম"><b>${esc(collName(c))}</b></td>
-    <td data-l="ধার্য্য">${taka(c.fee)}</td><td data-l="পূর্ব বকেয়া">${taka(c.dueBefore)}</td><td data-l="পরিশোধ"><b>${taka(c.paid)}</b></td>
+    <td data-l="ধার্য্য">${taka(c.fee)}</td><td data-l="পূর্ব বকেয়া">${taka(c.dueBefore)}</td><td data-l="পরিশোধ"><b>${taka(c.paid)}</b></td><td data-l="মাস">${esc(c.months || '')}</td>
     <td class="act"><button class="ib" title="এডিট" onclick="editColl('${c.id}')">${icon('edit', 17)}</button><button class="ib" title="প্রিন্ট" onclick="printReceipt('${c.id}')">${icon('print', 17)}</button><button class="ib" title="শেয়ার" onclick="openShare('coll','${c.id}')">${icon('share', 17)}</button><button class="ib del" title="ডিলেট" onclick="delColl('${c.id}')">${icon('trash', 17)}</button></td></tr>`).join('')
-    : '<tr><td colspan="8" class="empty">কোনো আদায় পাওয়া যায়নি</td></tr>';
+    : '<tr><td colspan="9" class="empty">কোনো আদায় পাওয়া যায়নি</td></tr>';
 }
 function receiptHtml(c, copy) {
   const remain = num(c.dueBefore) - num(c.paid);
@@ -595,6 +620,7 @@ function receiptHtml(c, copy) {
       <tr><td>সদস্যের নাম</td><td>${esc(collName(c))} (${esc(c.memberId)})</td></tr>
       <tr><td>মোবাইল নং</td><td>${bn(esc(c.mobile))}</td></tr>
       <tr><td>ঠিকানা</td><td>${esc(c.address)}</td></tr>
+      ${c.months ? `<tr><td>মাস</td><td>${esc(c.months)}</td></tr>` : ''}
     </table>
     <table style="margin-top:6px"><thead><tr><th>বিবরণ</th><th class="r">মাসিক ধার্য্য</th><th class="r">পূর্ব বকেয়া</th><th class="r">পরিশোধ</th><th class="r">অবশিষ্ট বকেয়া</th></tr></thead>
     <tbody><tr><td>সদস্য চাঁদা</td><td class="r">${taka(c.fee)}</td><td class="r">${taka(c.dueBefore)}</td><td class="r"><b>${taka(c.paid)}</b></td><td class="r">${taka(remain)}</td></tr></tbody></table>
@@ -607,9 +633,9 @@ function printReceipt(id) {
 function printCollList() {
   const rows = S.collections.slice().sort(byNo('receiptNo'));
   printDoc(docHeader() + `<div class="dt u"><span>সদস্য চাঁদা আদায় তালিকা</span></div>
-    <table><thead><tr><th>রশিদ নং</th><th>তারিখ</th><th>সদস্য আইডি</th><th>নাম</th><th class="r">ধার্য্য</th><th class="r">পূর্ব বকেয়া</th><th class="r">পরিশোধ</th></tr></thead><tbody>
-    ${rows.map(c => `<tr><td>${bn(c.receiptNo)}</td><td>${fdate(c.date)}</td><td>${esc(c.memberId)}</td><td>${esc(collName(c))}</td><td class="r">${bn(num(c.fee))}</td><td class="r">${bn(num(c.dueBefore))}</td><td class="r">${bn(num(c.paid))}</td></tr>`).join('')}
-    <tr><td colspan="6" class="r"><b>সর্বমোট</b></td><td class="r"><b>${taka(sum(rows, 'paid'))}</b></td></tr>
+    <table><thead><tr><th>রশিদ নং</th><th>তারিখ</th><th>সদস্য আইডি</th><th>নাম</th><th class="r">ধার্য্য</th><th class="r">পূর্ব বকেয়া</th><th class="r">পরিশোধ</th><th>মাস</th></tr></thead><tbody>
+    ${rows.map(c => `<tr><td>${bn(c.receiptNo)}</td><td>${fdate(c.date)}</td><td>${esc(c.memberId)}</td><td>${esc(collName(c))}</td><td class="r">${bn(num(c.fee))}</td><td class="r">${bn(num(c.dueBefore))}</td><td class="r">${bn(num(c.paid))}</td><td>${esc(c.months || '')}</td></tr>`).join('')}
+    <tr><td colspan="6" class="r"><b>সর্বমোট</b></td><td class="r"><b>${taka(sum(rows, 'paid'))}</b></td><td></td></tr>
     </tbody></table>${listFoot()}`);
 }
 
@@ -716,7 +742,7 @@ function receiptInfo(kind, id) {
     const c = S.collections.find(x => x.id === id); if (!c) return null;
     return {
       html: receiptHtml(c, ''), title: 'জমা রশিদ নং ' + bn(c.receiptNo), name: 'receipt-' + en(c.receiptNo), mobile: c.mobile,
-      text: `${org}\nজমা রশিদ নং: ${bn(c.receiptNo)}\nতারিখ: ${fdate(c.date)}\nসদস্য: ${collName(c)} (${c.memberId})\nপরিশোধ: ${taka(c.paid)}\nঅবশিষ্ট বকেয়া: ${taka(num(c.dueBefore) - num(c.paid))}\nধন্যবাদ।`
+      text: `${org}\nজমা রশিদ নং: ${bn(c.receiptNo)}\nতারিখ: ${fdate(c.date)}\nসদস্য: ${collName(c)} (${c.memberId})\n${c.months ? 'মাস: ' + c.months + '\n' : ''}পরিশোধ: ${taka(c.paid)}\nঅবশিষ্ট বকেয়া: ${taka(num(c.dueBefore) - num(c.paid))}\nধন্যবাদ।`
     };
   }
   const x = S.special.find(v => v.id === id); if (!x) return null;
